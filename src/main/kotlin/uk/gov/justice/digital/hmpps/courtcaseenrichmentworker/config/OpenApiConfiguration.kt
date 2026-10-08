@@ -1,8 +1,10 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.config
 
+import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.info.Contact
 import io.swagger.v3.oas.models.info.Info
+import io.swagger.v3.oas.models.security.SecurityRequirement
 import io.swagger.v3.oas.models.security.SecurityScheme
 import io.swagger.v3.oas.models.servers.Server
 import org.springframework.boot.info.BuildProperties
@@ -30,12 +32,15 @@ class OpenApiConfiguration(buildProperties: BuildProperties) {
       Info().title("HMPPS Court Case Enrichment Worker").version(version)
         .contact(Contact().name("HMPPS Digital Studio").email("feedback@digital.justice.gov.uk")),
     )
-  // TODO Add security schema and roles in `.components()` and `.addSecurityItem()`
+    .components(
+      Components().addSecuritySchemes(
+        "bearerAuth",
+        SecurityScheme()
+          .type(SecurityScheme.Type.HTTP)
+          .scheme("bearer")
+          .bearerFormat("JWT")
+          .description("A valid HMPPS Auth access token. No specific role is required for /ping."),
+      ),
+    )
+    .addSecurityItem(SecurityRequirement().addList("bearerAuth"))
 }
-
-private fun SecurityScheme.addBearerJwtRequirement(role: String): SecurityScheme = type(SecurityScheme.Type.HTTP)
-  .scheme("bearer")
-  .bearerFormat("JWT")
-  .`in`(SecurityScheme.In.HEADER)
-  .name("Authorization")
-  .description("A HMPPS Auth access token with the `$role` role.")

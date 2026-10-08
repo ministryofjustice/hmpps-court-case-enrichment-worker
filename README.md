@@ -111,6 +111,28 @@ Documentation for these patterns can be found in the [HMPPS tech docs](https://t
 If this documentation is incorrect or needs improving please report to [#ask-prisons-digital-sre](https://moj.enterprise.slack.com/archives/C06MWP0UKDE)
 or [raise a PR](https://github.com/ministryofjustice/hmpps-tech-docs).
 
+## Validating a deployment
+
+`GET /ping` returns HTTP 200 with the following JSON for a valid HMPPS Auth bearer token.
+No specific role is required. Requests without a valid token return HTTP 401.
+
+```json
+{"message":"HMPPS Court Case Enrichment Worker is running"}
+```
+
+Set `TOKEN` to an access token from HMPPS Auth for the environment being checked:
+
+```bash
+curl --fail-with-body -H "Authorization: Bearer $TOKEN" \
+  https://court-case-enrichment-worker-dev.hmpps.service.justice.gov.uk/ping
+
+curl --fail-with-body -H "Authorization: Bearer $TOKEN" \
+  https://court-case-enrichment-worker-preprod.hmpps.service.justice.gov.uk/ping
+```
+
+The existing ingress IP allowlists still apply. This endpoint confirms that the application
+is responding; use `/health` to check its dependencies.
+
 ## Running the application locally
 
 The application comes with a `dev` spring profile that includes default settings for running locally. This is not
