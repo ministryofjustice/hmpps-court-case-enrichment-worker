@@ -1,11 +1,11 @@
 ---
-# Per environment values which override defaults in hmpps-template-kotlin/values.yaml
+# Per environment values which override defaults in hmpps-court-case-enrichment-worker/values.yaml
 
 generic-service:
   replicaCount: 2
 
   ingress:
-    host: template-kotlin-preprod.hmpps.service.justice.gov.uk
+    host: court-case-enrichment-worker-preprod.hmpps.service.justice.gov.uk
     # modsecurity_enabled: true
 
   env:
