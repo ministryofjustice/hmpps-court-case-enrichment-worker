@@ -7,6 +7,7 @@ generic-service:
     # modsecurity_enabled: true
 
   env:
+    SPRING_PROFILES_ACTIVE: "prod"
     HMPPS_AUTH_URL: "https://sign-in.hmpps.service.justice.gov.uk/auth"
  
   allowlist:

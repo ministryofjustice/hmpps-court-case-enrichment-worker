@@ -9,6 +9,7 @@ generic-service:
     # modsecurity_enabled: true
 
   env:
+    SPRING_PROFILES_ACTIVE: "preprod"
     APPLICATIONINSIGHTS_CONFIGURATION_FILE: "applicationinsights.dev.json"
     HMPPS_AUTH_URL: "https://sign-in-preprod.hmpps.service.justice.gov.uk/auth"
 
