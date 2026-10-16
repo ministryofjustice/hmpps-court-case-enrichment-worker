@@ -1,2 +1,27 @@
 hmpps-auth:
   url: "http://localhost:8090/auth"
+
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          offender-search-client:
+            client-id: ${OFFENDER_SEARCH_CLIENT_ID:local-offender-search-client}
+            client-secret: ${OFFENDER_SEARCH_CLIENT_SECRET:local-offender-search-secret}
+          court-case-service-client:
+            client-id: ${COURT_CASE_SERVICE_CLIENT_ID:local-court-case-client}
+            client-secret: ${COURT_CASE_SERVICE_CLIENT_SECRET:local-court-case-secret}
+          person-record-search-client:
+            client-id: ${PERSON_RECORD_SEARCH_CLIENT_ID:local-person-record-client}
+            client-secret: ${PERSON_RECORD_SEARCH_CLIENT_SECRET:local-person-record-secret}
+
+person-record-service:
+  base-url: ${PERSON_RECORD_SERVICE_BASE_URL:https://hmpps-person-record-dev.hmpps.service.justice.gov.uk}
+  disable-authentication: ${CPR_SERVICE_DISABLE_AUTHENTICATION:true}
+
+court-case-service:
+  base-url: ${COURT_CASE_SERVICE_BASE_URL:https://court-case-service-dev.apps.live-1.cloud-platform.service.justice.gov.uk}
+
+offender-search:
+  base-url: ${OFFENDER_SEARCH_BASE_URL:https://probation-offender-search-dev.hmpps.service.justice.gov.uk}

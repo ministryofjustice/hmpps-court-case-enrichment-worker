@@ -9,6 +9,9 @@ generic-service:
   env:
     SPRING_PROFILES_ACTIVE: "prod"
     HMPPS_AUTH_URL: "https://sign-in.hmpps.service.justice.gov.uk/auth"
+    PERSON_RECORD_SERVICE_BASE_URL: "https://hmpps-person-record.hmpps.service.justice.gov.uk"
+    COURT_CASE_SERVICE_BASE_URL: "https://court-case-service.apps.live-1.cloud-platform.service.justice.gov.uk"
+    OFFENDER_SEARCH_BASE_URL: "https://probation-offender-search.hmpps.service.justice.gov.uk"
  
   allowlist:
     # Configure groups as appropriate to give the minimum ingress access required:

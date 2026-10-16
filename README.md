@@ -113,6 +113,44 @@ or [raise a PR](https://github.com/ministryofjustice/hmpps-tech-docs).
 
 ## Validating a deployment
 
+### Defendant enrichment job endpoint
+
+`POST /jobs/enrich-defendants` is reserved for invoking defendant enrichment from
+a Kubernetes CronJob. It requires a valid HMPPS Auth bearer token and currently
+requires no specific role or request body.
+
+The job accepts no court-code parameter. For this POC it is hard-coded to
+`B03DE` in `DefendantEnrichmentJobService` for both Common Platform and Libra
+target fetches. This temporary filter will be removed when the batch is ready
+to run across all courts; callers will still invoke the job without a court code.
+
+The workflow currently fetches all pages of Common Platform defendant IDs
+and Libra cIDs from CCS for today through the next 14 days (exclusive end date).
+`EnrichmentTargetService` owns these CCS target calls and pagination validation.
+It then enriches every target synchronously using `DefendantEnrichmentService`,
+keeping Common Platform and Libra CPR lookups separate. CPR CRNs are looked up in
+Offender Search once per distinct CRN per target. No name-based `/match` fallback
+is performed; this follows CCM's existing `CprService`.
+
+Authenticated successful requests return HTTP 200 with status
+`ENRICHMENT_COMPLETED`, fetched/processed counts, and a `results` array containing
+the clean enrichment results. A CPR 404 produces `NO_MATCH`. A CPR record without
+CRNs still enriches defendant details. Multiple CRNs or zero/multiple Offender
+Search responses produce `NEEDS_REVIEW` with candidate matches, but no selected
+offender or probation details. Only one CPR CRN with exactly one search response
+supplies those details. Grouped matches use `NAME_DOB_ALIAS`, with confirmed and
+rejected both false, and use the first search response for candidate PNC/CRO,
+matching the existing CCM behavior.
+
+Downstream errors, empty successful response bodies, invalid dates, blank CRNs,
+and inconsistent exact-match identifiers fail the job instead of becoming
+`NO_MATCH`. Processing stops on the first error and the endpoint returns a
+non-2xx response. On successful runs, failed and persisted counts are zero.
+Results are returned to the caller only; they are not stored.
+Do not enable a scheduled CronJob until persistence is implemented and the
+CCS update contract is agreed. An eventual HTTP caller should treat non-2xx responses as job failures
+(for example, use `curl --fail-with-body`).
+
 `GET /ping` returns HTTP 200 with the following JSON for a valid HMPPS Auth bearer token.
 No specific role is required. Requests without a valid token return HTTP 401.
 
@@ -134,6 +172,82 @@ The existing ingress IP allowlists still apply. This endpoint confirms that the 
 is responding; use `/health` to check its dependencies.
 
 ## Running the application locally
+
+### Offender Search client
+
+`OffenderSearchRestClient.match(MatchRequest)` posts JSON to `/match`.
+`search(crn)` posts a typed JSON request to `/search`, deserializes the response
+array, and returns a `SearchResponses` wrapper. API models do not include the
+other service's domain conversions or application-side match probability.
+Callers supply the match request; the other service's domain-dependent factory
+has not been copied.
+
+Both operations use the `offender-search-client` OAuth client-credentials
+registration, a 10-second timeout per attempt, and up to three retries with
+exponential backoff for transport errors, timeouts, and HTTP 5xx responses.
+HTTP 4xx (including 429), malformed responses, and empty response bodies are
+propagated without retrying. A JSON `[]` is a valid empty search result.
+Retry logs do not include personal data or request bodies.
+
+Before deployment, map this worker's own OAuth credentials to
+`OFFENDER_SEARCH_CLIENT_ID` and `OFFENDER_SEARCH_CLIENT_SECRET` using Helm
+`namespace_secrets`. The secret resource/key names have not been supplied, so
+that mapping is not included. Preprod and prod require these variables at startup.
+Local dev credentials are placeholders and must be overridden for live calls.
+`OFFENDER_SEARCH_BASE_URL` is configured for each environment in Helm.
+For local mocking, override it and set `OFFENDER_SEARCH_DISABLE_AUTHENTICATION=true`.
+
+### Court Case Service client
+
+`CourtCaseServiceClient.getDefendantIds` and `getCids` fetch a single page from
+`/enrichment-targets/defendant-ids` and `/enrichment-targets/cids` respectively.
+Both accept an inclusive `fromDate`, exclusive `toDate`, optional `courtCode`,
+zero-based `page` (default 0), and `size` (default 200, valid range 1-500).
+The response includes pagination metadata; callers use `hasNext` to request subsequent pages.
+
+Requests use a service token obtained from HMPPS Auth with the
+`court-case-service-client` OAuth registration, not the caller's bearer token.
+Before deploying, provision this worker's own credentials and map them to
+`COURT_CASE_SERVICE_CLIENT_ID` and `COURT_CASE_SERVICE_CLIENT_SECRET` through
+Helm `namespace_secrets`. Do not reuse Court Case Matcher's credentials.
+The worker's secret resource/key names have not yet been supplied, so that mapping
+is not included. Preprod and prod require these variables at startup.
+The local `dev` profile has placeholder credentials that must be overridden
+to call the deployed service.
+
+`COURT_CASE_SERVICE_BASE_URL` is configured per environment in Helm.
+`court-case-service.timeout` defaults to 10 seconds per attempt.
+Transport failures, timeouts, and HTTP 5xx responses receive up to three retries;
+other HTTP errors and malformed/empty responses are propagated.
+
+#### Draft enrichment persistence contract
+
+`CourtCaseServiceClient.persistEnrichmentResult(PersistEnrichmentResultRequest)`
+posts one clean result per target using the same CCS service OAuth registration.
+The proposed path is **`POST /enrichment-results`**, configurable with
+`COURT_CASE_SERVICE_POST_ENRICHMENT_URL`. This endpoint and request schema are
+drafts: CCS has not implemented or agreed them yet. The batch job does not call
+this method.
+
+The request distinguishes `COMMON_PLATFORM` defendant IDs from `LIBRA` cIDs
+using `sourceType` and `targetId`. It carries an enrichment status, normalized
+defendant details (CPR UUID, name, date of birth, sex, address), offender identifiers,
+probation details (including termination date and pre-sentence activity), and
+grouped CRN matches with normalized aliases and confirmation/rejection flags.
+It also includes warnings, errors, `enrichedBy`, and an optional `jobRunId`.
+No raw CPR or Offender Search response objects are part of the contract.
+
+Any 2xx response acknowledges the write; the response body is discarded.
+Non-2xx responses, including redirects, and transport/timeouts are propagated.
+Writes have a 10-second timeout and **no automatic retries** because CCS write
+idempotency is not defined. A timeout may mean the write succeeded at CCS; do not
+blindly replay it.
+
+Before enabling persistence, agree the endpoint, accepted statuses, null/omitted
+field semantics (preserve versus clear), missing-CPR behavior, protection of
+existing confirmed matches, and idempotency with CCS. In particular, the current
+`CprService` preserves existing date of birth and address when CPR supplies no
+replacement; a nullable DTO alone does not define that update behavior.
 
 The application comes with a `dev` spring profile that includes default settings for running locally. This is not
 necessary when deploying to kubernetes as these values are included in the helm configuration templates -

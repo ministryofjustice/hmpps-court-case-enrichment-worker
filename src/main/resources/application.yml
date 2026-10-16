@@ -21,6 +21,24 @@ spring:
         provider:
           hmpps-auth:
             token-uri: ${hmpps-auth.url}/oauth/token
+        registration:
+          offender-search-client:
+            provider: hmpps-auth
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: client_credentials
+            client-id: ${OFFENDER_SEARCH_CLIENT_ID}
+            client-secret: ${OFFENDER_SEARCH_CLIENT_SECRET}
+          court-case-service-client:
+            provider: hmpps-auth
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: client_credentials
+            client-id: ${COURT_CASE_SERVICE_CLIENT_ID}
+            client-secret: ${COURT_CASE_SERVICE_CLIENT_SECRET}
+          person-record-search-client:
+            provider: hmpps-auth
+            authorization-grant-type: client_credentials
+            client-id: ${PERSON_RECORD_SEARCH_CLIENT_ID}
+            client-secret: ${PERSON_RECORD_SEARCH_CLIENT_SECRET}
   http:
     codecs:
       max-in-memory-size: 10MB
@@ -63,3 +81,20 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+person-record-service:
+  base-url: ${PERSON_RECORD_SERVICE_BASE_URL:http://localhost:8091}
+  disable-authentication: ${CPR_SERVICE_DISABLE_AUTHENTICATION:false}
+  timeout: 10s
+
+court-case-service:
+  base-url: ${COURT_CASE_SERVICE_BASE_URL}
+  timeout: 10s
+  post-enrichment-url: ${COURT_CASE_SERVICE_POST_ENRICHMENT_URL:/enrichment-results}
+
+offender-search:
+  base-url: ${OFFENDER_SEARCH_BASE_URL}
+  post-match-url: /match
+  post-search-url: /search
+  disable-authentication: ${OFFENDER_SEARCH_DISABLE_AUTHENTICATION:false}
+  timeout: 10s
