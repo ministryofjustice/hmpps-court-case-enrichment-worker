@@ -8,6 +8,31 @@ management.endpoint:
 hmpps-auth:
   url: "http://localhost:8090/auth"
 
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          offender-search-client:
+            client-id: test-offender-search-client
+            client-secret: test-offender-search-secret
+          court-case-service-client:
+            client-id: test-court-case-client
+            client-secret: test-court-case-secret
+          person-record-search-client:
+            client-id: test-client-id
+            client-secret: test-client-secret
+
+person-record-service:
+  base-url: "http://localhost:8091"
+  disable-authentication: true
+
+court-case-service:
+  base-url: "http://localhost:8092"
+
+offender-search:
+  base-url: "http://localhost:8093"
+
 springdoc:
   api-docs:
     enabled: true

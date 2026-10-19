@@ -12,6 +12,10 @@ generic-service:
     SPRING_PROFILES_ACTIVE: "dev"
     APPLICATIONINSIGHTS_CONFIGURATION_FILE: "applicationinsights.dev.json"
     HMPPS_AUTH_URL: "https://sign-in-dev.hmpps.service.justice.gov.uk/auth"
+    PERSON_RECORD_SERVICE_BASE_URL: "https://hmpps-person-record-dev.hmpps.service.justice.gov.uk"
+    COURT_CASE_SERVICE_BASE_URL: "https://court-case-service-dev.apps.live-1.cloud-platform.service.justice.gov.uk"
+    OFFENDER_SEARCH_BASE_URL: "https://probation-offender-search-dev.hmpps.service.justice.gov.uk"
+    CPR_SERVICE_DISABLE_AUTHENTICATION: "false"
     SPRINGDOC_API-DOCS_ENABLED: "true"
     SPRINGDOC_SWAGGER-UI_ENABLED: "true"
 

@@ -11,6 +11,8 @@ services:
     environment:
       - SERVER_PORT=8080
       - HMPPS_AUTH_URL=http://hmpps-auth:8080/auth
+      - PERSON_RECORD_SERVICE_BASE_URL=http://host.docker.internal:8091
+      - CPR_SERVICE_DISABLE_AUTHENTICATION=true
       - SPRING_PROFILES_ACTIVE=dev
 
   hmpps-auth:
