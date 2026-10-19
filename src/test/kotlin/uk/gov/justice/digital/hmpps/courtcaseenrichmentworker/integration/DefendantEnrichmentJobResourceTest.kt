@@ -12,12 +12,6 @@ class DefendantEnrichmentJobResourceTest : IntegrationTestBase() {
   private lateinit var jobService: DefendantEnrichmentJobService
 
   @Test
-  fun `requires authentication`() {
-    webTestClient.post().uri("/jobs/enrich-defendants")
-      .exchange().expectStatus().isUnauthorized
-  }
-
-  @Test
   fun `rejects an invalid bearer token`() {
     webTestClient.post().uri("/jobs/enrich-defendants")
       .headers { it.setBearerAuth("invalid-token") }
@@ -25,13 +19,28 @@ class DefendantEnrichmentJobResourceTest : IntegrationTestBase() {
   }
 
   @Test
-  fun `authenticated invocation returns the enrichment job result`() {
+  fun `GET remains protected without a token`() {
+    webTestClient.get().uri("/jobs/enrich-defendants")
+      .exchange().expectStatus().isUnauthorized
+  }
+
+  @Test
+  fun `OpenAPI documents anonymous access for the job only`() {
+    webTestClient.get().uri("/v3/api-docs")
+      .exchange().expectStatus().isOk
+      .expectBody()
+      .jsonPath("$.paths['/jobs/enrich-defendants'].post.security").isArray
+      .jsonPath("$.paths['/jobs/enrich-defendants'].post.security").isEmpty
+      .jsonPath("$.paths['/ping'].get.security[0].bearerAuth").isArray
+  }
+
+  @Test
+  fun `anonymous invocation returns the enrichment job result`() {
     val date = LocalDate.of(2026, 10, 14)
     `when`(jobService.enrichDefendants()).thenReturn(
       DefendantEnrichmentJobResult("run-123", "TARGETS_FETCHED", date, date.plusDays(1), null, 2, 1, 0, 0, 0, 0),
     )
     webTestClient.post().uri("/jobs/enrich-defendants")
-      .headers(setAuthorisation())
       .exchange().expectStatus().isOk
       .expectBody()
       .jsonPath("$.status").isEqualTo("TARGETS_FETCHED")

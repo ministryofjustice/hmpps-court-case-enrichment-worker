@@ -116,8 +116,14 @@ or [raise a PR](https://github.com/ministryofjustice/hmpps-tech-docs).
 ### Defendant enrichment job endpoint
 
 `POST /jobs/enrich-defendants` is reserved for invoking defendant enrichment from
-a Kubernetes CronJob. It requires a valid HMPPS Auth bearer token and currently
-requires no specific role or request body.
+a Kubernetes CronJob. This POST endpoint permits anonymous access and requires
+no bearer token or request body. Other protected endpoints, including `/ping`,
+still require authentication. Outbound CCS calls still use service OAuth credentials.
+
+Calling from the same namespace does not enforce namespace-only access.
+Any caller able to reach this endpoint can trigger the job, including via the
+existing ingress allowlist. Restrict access using ingress rules and Kubernetes
+NetworkPolicies if the endpoint must be limited to internal callers.
 
 The job accepts no court-code parameter and currently fetches targets across all
 courts. The temporary `B03DE` filter and enrichment invocation are commented out

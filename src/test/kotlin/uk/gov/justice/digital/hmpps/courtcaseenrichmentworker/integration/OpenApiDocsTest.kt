@@ -87,7 +87,7 @@ class OpenApiDocsTest(
     val securityRequirements = result.openAPI.security.flatMap { it.keys }
     result.openAPI.paths.forEach { pathItem ->
       pathItem.value.readOperations().forEach { operation ->
-        assertThat(operation.security.flatMap { it.keys }).isSubsetOf(securityRequirements)
+        assertThat(operation.security.orEmpty().flatMap { it.keys }).isSubsetOf(securityRequirements)
       }
     }
   }
