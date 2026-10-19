@@ -14,21 +14,23 @@ class DefendantEnrichmentJobService(
   private val defendantEnrichmentService: DefendantEnrichmentService,
 ) {
   fun enrichDefendants(): DefendantEnrichmentJobResult {
-    val courtCode = POC_COURT_CODE
+//    val courtCode = POC_COURT_CODE
     val runId = UUID.randomUUID().toString()
+
+    // Temporarily limited to today's data for the POC; toDate is exclusive.
     val fromDate = LocalDate.now(clock)
-    val toDate = fromDate.plusDays(14)
+    val toDate = fromDate.plusDays(1)
 
     log.info(
-      "Starting defendant enrichment target fetch runId={} fromDate={} toDate={} courtCode={}",
+      "Starting defendant enrichment target fetch runId={} fromDate={} toDate={}",
       runId,
       fromDate,
       toDate,
-      courtCode,
+      // courtCode,
     )
 
-    val defendantIdsFetched = enrichmentTargetService.fetchAllDefendantIds(runId, fromDate, toDate, courtCode)
-    val cidsFetched = enrichmentTargetService.fetchAllCids(runId, fromDate, toDate, courtCode)
+    val defendantIdsFetched = enrichmentTargetService.fetchAllDefendantIds(runId, fromDate, toDate, null) // courtCode)
+    val cidsFetched = enrichmentTargetService.fetchAllCids(runId, fromDate, toDate, null) // courtCode)
 
     log.info(
       "Completed defendant enrichment target fetch runId={} defendantIdsFetched={} cidsFetched={}",
@@ -37,24 +39,25 @@ class DefendantEnrichmentJobService(
       cidsFetched.size,
     )
 
-    val results = defendantIdsFetched.map(defendantEnrichmentService::enrichCommonPlatformDefendant) +
-      cidsFetched.map(defendantEnrichmentService::enrichLibraDefendant)
+//    val results = defendantIdsFetched.map(defendantEnrichmentService::enrichCommonPlatformDefendant) +
+//      cidsFetched.map(defendantEnrichmentService::enrichLibraDefendant)
 
-    log.info("Completed defendant enrichment runId={} processed={}", runId, results.size)
+//    log.info("Completed defendant enrichment runId={} processed={}", runId, results.size)
 
     return DefendantEnrichmentJobResult(
       runId = runId,
-      status = "ENRICHMENT_COMPLETED",
+      status = "TARGETS_FETCHED",
       fromDate = fromDate,
       toDate = toDate,
-      courtCode = courtCode,
+//      courtCode = courtCode,
+      courtCode = null,
       defendantIdsFetched = defendantIdsFetched.size.toLong(),
       cidsFetched = cidsFetched.size.toLong(),
-      defendantIdsProcessed = defendantIdsFetched.size.toLong(),
-      cidsProcessed = cidsFetched.size.toLong(),
+      defendantIdsProcessed = 0,
+      cidsProcessed = 0,
       persistedResults = 0,
       failedResults = 0,
-      results = results,
+      results = emptyList(), // results, // TODO: re-enable when enrichment is implemented
     )
   }
 
@@ -62,6 +65,6 @@ class DefendantEnrichmentJobService(
     private val log = LoggerFactory.getLogger(DefendantEnrichmentJobService::class.java)
 
     // Remove the POC filter when the batch is ready to process all courts.
-    private const val POC_COURT_CODE = "B03DE"
+//    private const val POC_COURT_CODE = "B03DE"
   }
 }

@@ -13,6 +13,8 @@ import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.web.reactive.function.client.WebClient
@@ -40,7 +42,7 @@ class DefendantEnrichmentWorkflowTest {
   }
 
   @Test
-  fun `fetches both target sources and enriches through real CPR and offender search clients`() {
+  fun `job only fetches targets while retained enrichment service can still be invoked explicitly`() {
     server.stubFor(
       get(urlPathEqualTo("/enrichment-targets/defendant-ids"))
         .willReturn(
@@ -90,27 +92,41 @@ class DefendantEnrichmentWorkflowTest {
 
     val result = job.enrichDefendants()
 
-    assertEquals("ENRICHMENT_COMPLETED", result.status)
-    assertEquals("B03DE", result.courtCode)
-    assertEquals(1L, result.defendantIdsProcessed)
-    assertEquals(1L, result.cidsProcessed)
-    assertEquals(listOf(EnrichmentSourceType.COMMON_PLATFORM, EnrichmentSourceType.LIBRA), result.results.map { it.sourceType })
-    assertEquals(listOf(EnrichmentStatus.ENRICHED, EnrichmentStatus.ENRICHED), result.results.map { it.status })
-    assertEquals("record-cp", result.results.first().defendant?.cprUUID)
-    assertEquals("X123", result.results.first().offender?.crn)
-    assertEquals("pnc", result.results.first().offender?.pnc)
-    assertEquals("CURRENT", result.results.first().probation?.probationStatus)
-    assertEquals(true, result.results.first().probation?.awaitingPsr)
-    assertEquals(true, result.results.first().probation?.breach)
-    assertEquals("record-libra", result.results.last().defendant?.cprUUID)
+    assertEquals("TARGETS_FETCHED", result.status)
+    assertNull(result.courtCode)
+    assertEquals(1L, result.defendantIdsFetched)
+    assertEquals(1L, result.cidsFetched)
+    assertEquals(0L, result.defendantIdsProcessed)
+    assertEquals(0L, result.cidsProcessed)
+    assertTrue(result.results.isEmpty())
     server.verify(
       1,
       getRequestedFor(urlPathEqualTo("/enrichment-targets/defendant-ids"))
         .withQueryParam("fromDate", equalTo("2026-10-14"))
-        .withQueryParam("toDate", equalTo("2026-10-28"))
-        .withQueryParam("courtCode", equalTo("B03DE")),
+        .withQueryParam("toDate", equalTo("2026-10-15")),
     )
-    server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")).withQueryParam("courtCode", equalTo("B03DE")))
+    server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
+    assertEquals(2, server.allServeEvents.size)
+    assertTrue(server.allServeEvents.all { !it.request.queryParams.containsKey("courtCode") })
+    server.verify(0, getRequestedFor(urlEqualTo("/person/commonplatform/cp-123")))
+    server.verify(0, getRequestedFor(urlEqualTo("/person/libra/libra-123")))
+    server.verify(0, postRequestedFor(urlEqualTo("/search")))
+    server.verify(0, postRequestedFor(urlEqualTo("/enrichment-results")))
+
+    val results = listOf(
+      enrichment.enrichCommonPlatformDefendant("cp-123"),
+      enrichment.enrichLibraDefendant("libra-123"),
+    )
+
+    assertEquals(listOf(EnrichmentSourceType.COMMON_PLATFORM, EnrichmentSourceType.LIBRA), results.map { it.sourceType })
+    assertEquals(listOf(EnrichmentStatus.ENRICHED, EnrichmentStatus.ENRICHED), results.map { it.status })
+    assertEquals("record-cp", results.first().defendant?.cprUUID)
+    assertEquals("X123", results.first().offender?.crn)
+    assertEquals("pnc", results.first().offender?.pnc)
+    assertEquals("CURRENT", results.first().probation?.probationStatus)
+    assertEquals(true, results.first().probation?.awaitingPsr)
+    assertEquals(true, results.first().probation?.breach)
+    assertEquals("record-libra", results.last().defendant?.cprUUID)
     server.verify(1, getRequestedFor(urlEqualTo("/person/commonplatform/cp-123")))
     server.verify(1, getRequestedFor(urlEqualTo("/person/libra/libra-123")))
     server.verify(1, postRequestedFor(urlEqualTo("/search")))

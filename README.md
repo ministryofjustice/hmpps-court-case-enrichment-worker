@@ -119,22 +119,27 @@ or [raise a PR](https://github.com/ministryofjustice/hmpps-tech-docs).
 a Kubernetes CronJob. It requires a valid HMPPS Auth bearer token and currently
 requires no specific role or request body.
 
-The job accepts no court-code parameter. For this POC it is hard-coded to
-`B03DE` in `DefendantEnrichmentJobService` for both Common Platform and Libra
-target fetches. This temporary filter will be removed when the batch is ready
-to run across all courts; callers will still invoke the job without a court code.
+The job accepts no court-code parameter and currently fetches targets across all
+courts. The temporary `B03DE` filter and enrichment invocation are commented out
+in `DefendantEnrichmentJobService` for this PR and retained for re-enabling later.
 
 The workflow currently fetches all pages of Common Platform defendant IDs
-and Libra cIDs from CCS for today through the next 14 days (exclusive end date).
+and Libra cIDs from CCS for today only: `fromDate` is today (inclusive) and
+`toDate` is tomorrow (exclusive).
 `EnrichmentTargetService` owns these CCS target calls and pagination validation.
-It then enriches every target synchronously using `DefendantEnrichmentService`,
+Successful invocations return HTTP 200 with status `TARGETS_FETCHED`, fetched
+counts, a null court code, zero processed/persisted/failed counts, and an empty
+`results` array. No CPR, Offender Search, or persistence calls are made by the job.
+CCS target-fetch failures still fail the job with a non-2xx response.
+
+The retained enrichment implementation (currently not invoked by the job)
+enriches every target synchronously using `DefendantEnrichmentService`,
 keeping Common Platform and Libra CPR lookups separate. CPR CRNs are looked up in
 Offender Search once per distinct CRN per target. No name-based `/match` fallback
 is performed; this follows CCM's existing `CprService`.
 
-Authenticated successful requests return HTTP 200 with status
-`ENRICHMENT_COMPLETED`, fetched/processed counts, and a `results` array containing
-the clean enrichment results. A CPR 404 produces `NO_MATCH`. A CPR record without
+When enrichment is re-enabled, it builds clean enrichment results.
+A CPR 404 produces `NO_MATCH`. A CPR record without
 CRNs still enriches defendant details. Multiple CRNs or zero/multiple Offender
 Search responses produce `NEEDS_REVIEW` with candidate matches, but no selected
 offender or probation details. Only one CPR CRN with exactly one search response
