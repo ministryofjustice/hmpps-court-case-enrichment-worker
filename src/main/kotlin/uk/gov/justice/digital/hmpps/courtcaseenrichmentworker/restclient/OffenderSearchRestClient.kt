@@ -23,7 +23,13 @@ class OffenderSearchRestClient(
   @param:Value("\${offender-search.disable-authentication:false}") private val disableAuthentication: Boolean,
   @param:Value("\${offender-search.timeout:10s}") private val timeout: Duration,
 ) {
-  fun match(body: MatchRequest): Mono<MatchResponse> = Mono.defer {
+  fun match(body: MatchRequest): Mono<MatchResponse> = logServiceCall(
+    operation = "Offender Search POST match",
+    call = { requestMatch(body) },
+    outcome = { "MATCHES_RECEIVED count=${it?.matchCount ?: 0}" },
+  )
+
+  private fun requestMatch(body: MatchRequest): Mono<MatchResponse> = Mono.defer {
     require(body.surname.isNotBlank()) { "No surname provided" }
     post(postMatchUrl).bodyValue(body).retrieve().bodyToMono(MatchResponse::class.java)
       .switchIfEmpty(Mono.error(IllegalStateException("Offender Search returned an empty match response")))
@@ -31,7 +37,13 @@ class OffenderSearchRestClient(
     .timeout(timeout)
     .retryWhen(serviceClientRetry("Offender Search match"))
 
-  fun search(crn: String): Mono<SearchResponses> = Mono.defer {
+  fun search(crn: String): Mono<SearchResponses> = logServiceCall(
+    operation = "Offender Search POST search",
+    call = { requestSearch(crn) },
+    outcome = { "SEARCH_RESULTS_RECEIVED count=${it?.searchResponses?.size ?: 0}" },
+  )
+
+  private fun requestSearch(crn: String): Mono<SearchResponses> = Mono.defer {
     require(crn.isNotBlank()) { "CRN must not be blank" }
     post(postSearchUrl).bodyValue(SearchRequest(crn)).retrieve()
       .bodyToMono(object : ParameterizedTypeReference<List<SearchResponse>>() {})

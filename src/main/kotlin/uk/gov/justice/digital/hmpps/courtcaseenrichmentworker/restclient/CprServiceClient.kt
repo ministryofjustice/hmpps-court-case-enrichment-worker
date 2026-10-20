@@ -37,7 +37,13 @@ class CprServiceClient(
   private fun getCprRecord(
     path: String,
     identifier: String,
-  ): Mono<CprDefendant> = get(path, identifier)
+  ): Mono<CprDefendant> = logServiceCall(
+    operation = "CPR GET $path",
+    call = { requestCprRecord(path, identifier) },
+    outcome = { if (it == null) "NOT_FOUND" else "RECORD_RECEIVED" },
+  )
+
+  private fun requestCprRecord(path: String, identifier: String): Mono<CprDefendant> = get(path, identifier)
     .exchangeToMono { response ->
       when {
         response.statusCode().is2xxSuccessful -> response.bodyToMono(CprDefendant::class.java)

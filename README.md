@@ -203,6 +203,15 @@ HTTP 4xx (including 429), malformed responses, and empty response bodies are
 propagated without retrying. A JSON `[]` is a valid empty search result.
 Retry logs do not include personal data or request bodies.
 
+CPR and Offender Search calls log an INFO start and completion with the operation,
+a per-call correlation ID, and elapsed milliseconds (including retries). CPR
+completion distinguishes `RECORD_RECEIVED` from `NOT_FOUND`; Offender Search
+completion includes the result count, including zero results. Completion is logged
+only after the response is successfully decoded. Final failures log a WARN with
+the exception type and downstream HTTP status when available; token-acquisition
+and transport failures may have no downstream status. These logs exclude
+identifiers, payloads, credentials, tokens, and exception messages.
+
 For the POC, Helm `namespace_secrets` maps `OFFENDER_SEARCH_CLIENT_ID` and
 `OFFENDER_SEARCH_CLIENT_SECRET` to `nomis-oauth-client-id` and
 `nomis-oauth-client-secret` in `court-case-service-secrets`. That secret must
