@@ -203,10 +203,17 @@ HTTP 4xx (including 429), malformed responses, and empty response bodies are
 propagated without retrying. A JSON `[]` is a valid empty search result.
 Retry logs do not include personal data or request bodies.
 
-Before deployment, map this worker's own OAuth credentials to
-`OFFENDER_SEARCH_CLIENT_ID` and `OFFENDER_SEARCH_CLIENT_SECRET` using Helm
-`namespace_secrets`. The secret resource/key names have not been supplied, so
-that mapping is not included. Preprod and prod require these variables at startup.
+For the POC, Helm `namespace_secrets` maps `OFFENDER_SEARCH_CLIENT_ID` and
+`OFFENDER_SEARCH_CLIENT_SECRET` to `nomis-oauth-client-id` and
+`nomis-oauth-client-secret` in `court-case-service-secrets`. That secret must
+exist in the worker's namespace in each deployed environment.
+The registration name `offender-search-client` is an internal alias; it does
+not need to match the registration name used by Court Case Service.
+The worker requests service-only client-credentials tokens from
+`${hmpps-auth.url}/oauth/token`, without a username. The OAuth client must
+support requests without a username and have access to Offender Search.
+Do not use a username-required client or fabricate a user identity for the batch.
+Preprod and prod require these variables at startup.
 Local dev credentials are placeholders and must be overridden for live calls.
 `OFFENDER_SEARCH_BASE_URL` is configured for each environment in Helm.
 For local mocking, override it and set `OFFENDER_SEARCH_DISABLE_AUTHENTICATION=true`.
