@@ -38,17 +38,17 @@ class DefendantEnrichmentJobResourceTest : IntegrationTestBase() {
   fun `anonymous invocation returns the enrichment job result`() {
     val date = LocalDate.of(2026, 10, 14)
     `when`(jobService.enrichDefendants()).thenReturn(
-      DefendantEnrichmentJobResult("run-123", "TARGETS_FETCHED", date, date.plusDays(1), null, 2, 1, 0, 0, 0, 0),
+      DefendantEnrichmentJobResult("run-123", "COMMON_PLATFORM_ENRICHMENT_COMPLETED", date, date.plusDays(14), "B03DE", 2, 1, 2, 0, 0, 0),
     )
     webTestClient.post().uri("/jobs/enrich-defendants")
       .exchange().expectStatus().isOk
       .expectBody()
-      .jsonPath("$.status").isEqualTo("TARGETS_FETCHED")
+      .jsonPath("$.status").isEqualTo("COMMON_PLATFORM_ENRICHMENT_COMPLETED")
       .jsonPath("$.runId").isEqualTo("run-123")
-      .jsonPath("$.courtCode").isEmpty
+      .jsonPath("$.courtCode").isEqualTo("B03DE")
       .jsonPath("$.defendantIdsFetched").isEqualTo(2)
       .jsonPath("$.cidsFetched").isEqualTo(1)
-      .jsonPath("$.defendantIdsProcessed").isEqualTo(0)
+      .jsonPath("$.defendantIdsProcessed").isEqualTo(2)
       .jsonPath("$.cidsProcessed").isEqualTo(0)
       .jsonPath("$.persistedResults").isEqualTo(0)
       .jsonPath("$.results").isEmpty

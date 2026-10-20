@@ -125,26 +125,29 @@ Any caller able to reach this endpoint can trigger the job, including via the
 existing ingress allowlist. Restrict access using ingress rules and Kubernetes
 NetworkPolicies if the endpoint must be limited to internal callers.
 
-The job accepts no court-code parameter and currently fetches targets across all
-courts. The temporary `B03DE` filter and enrichment invocation are commented out
-in `DefendantEnrichmentJobService` for this PR and retained for re-enabling later.
+The job accepts no court-code parameter and currently fetches targets only for
+court `B03DE`, hard-coded for the POC in `DefendantEnrichmentJobService`.
+Common Platform enrichment is enabled. Libra enrichment remains commented out
+and retained for re-enabling later.
 
 The workflow currently fetches all pages of Common Platform defendant IDs
-and Libra cIDs from CCS for today only: `fromDate` is today (inclusive) and
-`toDate` is tomorrow (exclusive).
+and Libra cIDs from CCS for 14 days starting today: `fromDate` is today
+(inclusive) and `toDate` is today plus 14 days (exclusive).
 `EnrichmentTargetService` owns these CCS target calls and pagination validation.
-Successful invocations return HTTP 200 with status `TARGETS_FETCHED`, fetched
-counts, a null court code, zero processed/persisted/failed counts, and an empty
-`results` array. No CPR, Offender Search, or persistence calls are made by the job.
-CCS target-fetch failures still fail the job with a non-2xx response.
+Successful invocations return HTTP 200 with status
+`COMMON_PLATFORM_ENRICHMENT_COMPLETED`, fetched counts for both sources, court
+code `B03DE`, the Common Platform processed count, and a `results` array containing
+Common Platform enrichment results. Libra processed, persisted, and failed counts
+remain zero. No persistence calls are made by the job.
+CCS target-fetch and enrichment failures fail the job with a non-2xx response.
 
-The retained enrichment implementation (currently not invoked by the job)
-enriches every target synchronously using `DefendantEnrichmentService`,
+The enrichment implementation processes Common Platform targets synchronously
+using `DefendantEnrichmentService`,
 keeping Common Platform and Libra CPR lookups separate. CPR CRNs are looked up in
 Offender Search once per distinct CRN per target. No name-based `/match` fallback
 is performed; this follows CCM's existing `CprService`.
 
-When enrichment is re-enabled, it builds clean enrichment results.
+Enrichment builds clean results.
 A CPR 404 produces `NO_MATCH`. A CPR record without
 CRNs still enriches defendant details. Multiple CRNs or zero/multiple Offender
 Search responses produce `NEEDS_REVIEW` with candidate matches, but no selected

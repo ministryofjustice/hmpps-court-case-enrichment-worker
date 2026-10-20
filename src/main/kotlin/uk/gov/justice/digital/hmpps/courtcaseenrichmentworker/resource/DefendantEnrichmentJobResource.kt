@@ -20,10 +20,11 @@ class DefendantEnrichmentJobResource(
   @Operation(
     summary = "Trigger defendant enrichment from a Kubernetes CronJob",
     description = "Fetches Common Platform defendant IDs and Libra cIDs from CCS, " +
-      "across all courts; no court-code parameter is accepted. " +
+      "for court B03DE for the POC; no court-code parameter is accepted. " +
       "No authentication is required; access must be restricted by network controls. " +
-      "Enrichment is temporarily disabled: no CPR, Offender Search, or persistence calls are made.",
+      "Common Platform targets are enriched synchronously using CPR and Offender Search. " +
+      "Libra enrichment remains disabled, and no persistence calls are made.",
   )
-  @ApiResponse(responseCode = "200", description = "Enrichment targets fetched without processing or persistence")
+  @ApiResponse(responseCode = "200", description = "Common Platform enrichment completed without persistence")
   fun enrichDefendants(): DefendantEnrichmentJobResult = defendantEnrichmentJobService.enrichDefendants()
 }

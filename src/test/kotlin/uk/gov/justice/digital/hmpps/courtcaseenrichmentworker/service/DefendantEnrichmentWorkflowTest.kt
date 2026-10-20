@@ -13,7 +13,6 @@ import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -42,7 +41,7 @@ class DefendantEnrichmentWorkflowTest {
   }
 
   @Test
-  fun `job only fetches targets while retained enrichment service can still be invoked explicitly`() {
+  fun `job enriches Common Platform while Libra enrichment remains available for explicit invocation`() {
     server.stubFor(
       get(urlPathEqualTo("/enrichment-targets/defendant-ids"))
         .willReturn(
@@ -92,31 +91,32 @@ class DefendantEnrichmentWorkflowTest {
 
     val result = job.enrichDefendants()
 
-    assertEquals("TARGETS_FETCHED", result.status)
-    assertNull(result.courtCode)
+    assertEquals("COMMON_PLATFORM_ENRICHMENT_COMPLETED", result.status)
+    assertEquals("B03DE", result.courtCode)
     assertEquals(1L, result.defendantIdsFetched)
     assertEquals(1L, result.cidsFetched)
-    assertEquals(0L, result.defendantIdsProcessed)
+    assertEquals(1L, result.defendantIdsProcessed)
     assertEquals(0L, result.cidsProcessed)
-    assertTrue(result.results.isEmpty())
+    assertEquals(1, result.results.size)
     server.verify(
       1,
       getRequestedFor(urlPathEqualTo("/enrichment-targets/defendant-ids"))
         .withQueryParam("fromDate", equalTo("2026-10-14"))
-        .withQueryParam("toDate", equalTo("2026-10-15")),
+        .withQueryParam("toDate", equalTo("2026-10-28"))
+        .withQueryParam("courtCode", equalTo("B03DE")),
     )
     server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
-    assertEquals(2, server.allServeEvents.size)
-    assertTrue(server.allServeEvents.all { !it.request.queryParams.containsKey("courtCode") })
-    server.verify(0, getRequestedFor(urlEqualTo("/person/commonplatform/cp-123")))
+    assertEquals(4, server.allServeEvents.size)
+    assertTrue(
+      server.allServeEvents.filter { it.request.url.startsWith("/enrichment-targets/") }
+        .all { it.request.queryParameter("courtCode").firstValue() == "B03DE" },
+    )
+    server.verify(1, getRequestedFor(urlEqualTo("/person/commonplatform/cp-123")))
     server.verify(0, getRequestedFor(urlEqualTo("/person/libra/libra-123")))
-    server.verify(0, postRequestedFor(urlEqualTo("/search")))
+    server.verify(1, postRequestedFor(urlEqualTo("/search")))
     server.verify(0, postRequestedFor(urlEqualTo("/enrichment-results")))
 
-    val results = listOf(
-      enrichment.enrichCommonPlatformDefendant("cp-123"),
-      enrichment.enrichLibraDefendant("libra-123"),
-    )
+    val results = result.results + enrichment.enrichLibraDefendant("libra-123")
 
     assertEquals(listOf(EnrichmentSourceType.COMMON_PLATFORM, EnrichmentSourceType.LIBRA), results.map { it.sourceType })
     assertEquals(listOf(EnrichmentStatus.ENRICHED, EnrichmentStatus.ENRICHED), results.map { it.status })
