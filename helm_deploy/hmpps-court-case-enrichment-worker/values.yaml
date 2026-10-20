@@ -40,6 +40,8 @@ generic-service:
     court-case-matcher-secrets:
       PERSON_RECORD_SEARCH_CLIENT_ID: "nomis-oauth-client-id"
       PERSON_RECORD_SEARCH_CLIENT_SECRET: "nomis-oauth-client-secret"
+      COURT_CASE_SERVICE_CLIENT_ID: "nomis-oauth-client-id"
+      COURT_CASE_SERVICE_CLIENT_SECRET: "nomis-oauth-client-secret"
 
 generic-prometheus-alerts:
   targetApplication: hmpps-court-case-enrichment-worker
