@@ -39,6 +39,7 @@ class CprServiceClient(
     identifier: String,
   ): Mono<CprDefendant> = logServiceCall(
     operation = "CPR GET $path",
+    connector = EnrichmentConnector.CPR,
     call = { requestCprRecord(path, identifier) },
     outcome = { if (it == null) "NOT_FOUND" else "RECORD_RECEIVED" },
   )

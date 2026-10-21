@@ -36,7 +36,7 @@ class DefendantEnrichmentService(
 
   private fun enrich(source: EnrichmentSourceType, targetId: String, person: CprDefendant?): EnrichmentResult {
     if (person == null) {
-      log.info("No CPR record found for enrichment source={}", source)
+      log.debug("No CPR record found for enrichment source={}", source)
       return EnrichmentResult(source, targetId, EnrichmentStatus.NO_MATCH)
     }
 

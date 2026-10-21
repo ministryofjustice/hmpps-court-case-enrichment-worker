@@ -25,6 +25,8 @@ class OffenderSearchRestClient(
 ) {
   fun match(body: MatchRequest): Mono<MatchResponse> = logServiceCall(
     operation = "Offender Search POST match",
+    connector = EnrichmentConnector.OFFENDER_SEARCH,
+    emptyResult = { it == null || it.matchCount == 0 },
     call = { requestMatch(body) },
     outcome = { "MATCHES_RECEIVED count=${it?.matchCount ?: 0}" },
   )
@@ -39,6 +41,8 @@ class OffenderSearchRestClient(
 
   fun search(crn: String): Mono<SearchResponses> = logServiceCall(
     operation = "Offender Search POST search",
+    connector = EnrichmentConnector.OFFENDER_SEARCH,
+    emptyResult = { it == null || it.searchResponses.isEmpty() },
     call = { requestSearch(crn) },
     outcome = { "SEARCH_RESULTS_RECEIVED count=${it?.searchResponses?.size ?: 0}" },
   )
