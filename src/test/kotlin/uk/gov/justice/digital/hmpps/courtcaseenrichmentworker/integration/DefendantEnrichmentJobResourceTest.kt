@@ -38,7 +38,7 @@ class DefendantEnrichmentJobResourceTest : IntegrationTestBase() {
   fun `anonymous invocation returns the enrichment job result`() {
     val date = LocalDate.of(2026, 10, 14)
     `when`(jobService.enrichDefendants()).thenReturn(
-      DefendantEnrichmentJobResult("run-123", "ENRICHMENT_COMPLETED", date, date.plusDays(14), "B03DE", 2, 1, 2, 1, 0, 0),
+      DefendantEnrichmentJobResult("run-123", "ENRICHMENT_COMPLETED", date, date.plusDays(14), "B03DE", 2, 1, 2, 1, 3, 0),
     )
     webTestClient.post().uri("/jobs/enrich-defendants")
       .exchange().expectStatus().isOk
@@ -50,7 +50,7 @@ class DefendantEnrichmentJobResourceTest : IntegrationTestBase() {
       .jsonPath("$.cidsFetched").isEqualTo(1)
       .jsonPath("$.defendantIdsProcessed").isEqualTo(2)
       .jsonPath("$.cidsProcessed").isEqualTo(1)
-      .jsonPath("$.persistedResults").isEqualTo(0)
+      .jsonPath("$.persistedResults").isEqualTo(3)
       .jsonPath("$.results").isEmpty
   }
 
