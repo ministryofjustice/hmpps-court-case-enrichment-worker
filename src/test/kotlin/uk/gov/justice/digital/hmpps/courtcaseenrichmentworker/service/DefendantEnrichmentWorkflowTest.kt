@@ -1,5 +1,8 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.service
 
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
@@ -11,11 +14,13 @@ import com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.web.reactive.function.client.WebClient
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
@@ -29,19 +34,25 @@ import java.time.ZoneOffset
 
 class DefendantEnrichmentWorkflowTest {
   private val server = WireMockServer(wireMockConfig().dynamicPort())
+  private val logger = LoggerFactory.getLogger("ServiceClientLogging") as Logger
+  private val appender = ListAppender<ILoggingEvent>()
 
   @BeforeEach
   fun start() {
     server.start()
+    appender.start()
+    logger.addAppender(appender)
   }
 
   @AfterEach
   fun stop() {
+    logger.detachAppender(appender)
+    appender.stop()
     server.stop()
   }
 
   @Test
-  fun `job enriches Common Platform while Libra enrichment remains available for explicit invocation`() {
+  fun `job enriches Common Platform and Libra using separate CPR lookups without persistence`() {
     server.stubFor(
       get(urlPathEqualTo("/enrichment-targets/defendant-ids"))
         .willReturn(
@@ -91,13 +102,18 @@ class DefendantEnrichmentWorkflowTest {
 
     val result = job.enrichDefendants()
 
-    assertEquals("COMMON_PLATFORM_ENRICHMENT_COMPLETED", result.status)
+    val summaries = appender.list.map { it.formattedMessage }.filter { it.startsWith("Connector summary") }
+    assertThat(summaries).hasSize(2)
+    assertThat(summaries[0]).contains("runId=${result.runId}", "connector=CPR", "calls=2 completed=2 emptyResults=0 failures=0")
+    assertThat(summaries[1]).contains("runId=${result.runId}", "connector=OFFENDER_SEARCH", "calls=1 completed=1 emptyResults=0 failures=0")
+
+    assertEquals("ENRICHMENT_COMPLETED", result.status)
     assertEquals("B03DE", result.courtCode)
     assertEquals(1L, result.defendantIdsFetched)
     assertEquals(1L, result.cidsFetched)
     assertEquals(1L, result.defendantIdsProcessed)
-    assertEquals(0L, result.cidsProcessed)
-    assertEquals(1, result.results.size)
+    assertEquals(1L, result.cidsProcessed)
+    assertEquals(2, result.results.size)
     server.verify(
       1,
       getRequestedFor(urlPathEqualTo("/enrichment-targets/defendant-ids"))
@@ -106,17 +122,17 @@ class DefendantEnrichmentWorkflowTest {
         .withQueryParam("courtCode", equalTo("B03DE")),
     )
     server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
-    assertEquals(4, server.allServeEvents.size)
+    assertEquals(5, server.allServeEvents.size)
     assertTrue(
       server.allServeEvents.filter { it.request.url.startsWith("/enrichment-targets/") }
         .all { it.request.queryParameter("courtCode").firstValue() == "B03DE" },
     )
     server.verify(1, getRequestedFor(urlEqualTo("/person/commonplatform/cp-123")))
-    server.verify(0, getRequestedFor(urlEqualTo("/person/libra/libra-123")))
+    server.verify(1, getRequestedFor(urlEqualTo("/person/libra/libra-123")))
     server.verify(1, postRequestedFor(urlEqualTo("/search")))
     server.verify(0, postRequestedFor(urlEqualTo("/enrichment-results")))
 
-    val results = result.results + enrichment.enrichLibraDefendant("libra-123")
+    val results = result.results
 
     assertEquals(listOf(EnrichmentSourceType.COMMON_PLATFORM, EnrichmentSourceType.LIBRA), results.map { it.sourceType })
     assertEquals(listOf(EnrichmentStatus.ENRICHED, EnrichmentStatus.ENRICHED), results.map { it.status })

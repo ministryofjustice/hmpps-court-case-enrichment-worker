@@ -1,5 +1,6 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient
 
+import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
@@ -13,19 +14,24 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.web.reactive.function.client.WebClientResponseException
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
 
 class ServiceClientLoggingTest {
   private val logger = LoggerFactory.getLogger("ServiceClientLogging") as Logger
   private val appender = ListAppender<ILoggingEvent>()
+  private var originalLevel: Level? = null
 
   @BeforeEach
   fun attachAppender() {
+    originalLevel = logger.level
+    logger.level = Level.DEBUG
     appender.start()
     logger.addAppender(appender)
   }
 
   @AfterEach
   fun detachAppender() {
+    logger.level = originalLevel
     logger.detachAppender(appender)
     appender.stop()
   }
@@ -89,5 +95,52 @@ class ServiceClientLoggingTest {
     assertThat(attempts).isEqualTo(2)
     assertThat(appender.list.map { it.formattedMessage }).hasSize(2)
       .noneMatch { it.contains("Failed downstream call") }
+  }
+
+  @Test
+  fun `INFO emits only connector summaries with successful empty and failed counts even on failure`() {
+    logger.level = Level.INFO
+    val error = IllegalStateException("sensitive failure")
+
+    assertSame(
+      error,
+      assertThrows(IllegalStateException::class.java) {
+        ServiceCallSummary("run-one").collecting {
+          logServiceCall("CPR", { Mono.just("sensitive result").subscribeOn(Schedulers.boundedElastic()) }) { "FOUND" }.block()
+          logServiceCall<String>("CPR", { Mono.empty() }) { "NOT_FOUND" }.block()
+          logServiceCall(
+            operation = "search",
+            call = { Mono.just(emptyList<String>()) },
+            connector = EnrichmentConnector.OFFENDER_SEARCH,
+            emptyResult = { it.isNullOrEmpty() },
+          ) { "EMPTY" }.block()
+          logServiceCall<String>("CPR", { Mono.error(error) }) { "SUCCESS" }.block()
+        }
+      },
+    )
+
+    val summaries = appender.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
+    assertThat(summaries).hasSize(2)
+    assertThat(summaries[0]).contains("runId=run-one", "connector=CPR", "calls=3 completed=2 emptyResults=1 failures=1", "elapsedMs=")
+    assertThat(summaries[1]).contains("connector=OFFENDER_SEARCH", "calls=1 completed=1 emptyResults=1 failures=0")
+    assertThat(appender.list).hasSize(3)
+    assertThat(appender.list.map { it.formattedMessage }.joinToString()).doesNotContain("sensitive")
+    assertThat(ServiceCallSummary.current.get()).isNull()
+  }
+
+  @Test
+  fun `summaries isolate runs and do not collect calls outside their scope`() {
+    logger.level = Level.INFO
+    ServiceCallSummary("first").collecting {
+      logServiceCall("CPR", { Mono.just("result") }) { "FOUND" }.block()
+    }
+    logServiceCall("CPR", { Mono.just("result") }) { "FOUND" }.block()
+    ServiceCallSummary("second").collecting { }
+
+    val messages = appender.list.map { it.formattedMessage }
+    assertThat(messages).hasSize(4)
+    assertThat(messages[0]).contains("runId=first", "connector=CPR", "calls=1")
+    assertThat(messages[2]).contains("runId=second", "connector=CPR", "calls=0")
+    assertThat(messages[3]).contains("runId=second", "connector=OFFENDER_SEARCH", "calls=0")
   }
 }

@@ -30,27 +30,29 @@ class DefendantEnrichmentJobServiceTest {
   private val to = from.plusDays(14)
 
   @Test
-  fun `fetches all pages for B03DE and enriches only Common Platform without persistence`() {
+  fun `fetches all pages for B03DE and enriches both sources without persistence`() {
     `when`(ccs.getDefendantIds(from, to, "B03DE", 0, 200)).thenReturn(Mono.just(DefendantIdsPage(listOf("cp1"), 0, 200, 2, 2, true)))
     `when`(ccs.getDefendantIds(from, to, "B03DE", 1, 200)).thenReturn(Mono.just(DefendantIdsPage(listOf("cp2"), 1, 200, 2, 2, false)))
     `when`(ccs.getCids(from, to, "B03DE", 0, 200)).thenReturn(Mono.just(CidsPage(listOf("libra"), 0, 200, 1, 1, false)))
     val results = listOf(
       EnrichmentResult(EnrichmentSourceType.COMMON_PLATFORM, "cp1", EnrichmentStatus.ENRICHED),
       EnrichmentResult(EnrichmentSourceType.COMMON_PLATFORM, "cp2", EnrichmentStatus.NO_MATCH),
+      EnrichmentResult(EnrichmentSourceType.LIBRA, "libra", EnrichmentStatus.ENRICHED),
     )
     `when`(enrichment.enrichCommonPlatformDefendant("cp1")).thenReturn(results[0])
     `when`(enrichment.enrichCommonPlatformDefendant("cp2")).thenReturn(results[1])
+    `when`(enrichment.enrichLibraDefendant("libra")).thenReturn(results[2])
 
     val result = service.enrichDefendants()
 
-    assertEquals("COMMON_PLATFORM_ENRICHMENT_COMPLETED", result.status)
+    assertEquals("ENRICHMENT_COMPLETED", result.status)
     assertEquals("B03DE", result.courtCode)
     assertEquals(from, result.fromDate)
     assertEquals(to, result.toDate)
     assertEquals(2L, result.defendantIdsFetched)
     assertEquals(1L, result.cidsFetched)
     assertEquals(2L, result.defendantIdsProcessed)
-    assertEquals(0L, result.cidsProcessed)
+    assertEquals(1L, result.cidsProcessed)
     assertEquals(0L, result.persistedResults)
     assertEquals(0L, result.failedResults)
     assertEquals(results, result.results)
@@ -60,6 +62,7 @@ class DefendantEnrichmentJobServiceTest {
     order.verify(ccs).getCids(from, to, "B03DE", 0, 200)
     order.verify(enrichment).enrichCommonPlatformDefendant("cp1")
     order.verify(enrichment).enrichCommonPlatformDefendant("cp2")
+    order.verify(enrichment).enrichLibraDefendant("libra")
     verifyNoMoreInteractions(ccs, enrichment)
   }
 
@@ -85,6 +88,20 @@ class DefendantEnrichmentJobServiceTest {
     assertSame(error, assertThrows(IllegalStateException::class.java) { service.enrichDefendants() })
 
     verifyNoInteractions(enrichment)
+  }
+
+  @Test
+  fun `Libra errors propagate and stop further Libra processing`() {
+    `when`(ccs.getDefendantIds(from, to, "B03DE", 0, 200)).thenReturn(Mono.just(DefendantIdsPage(emptyList(), 0, 200, 0, 0, false)))
+    `when`(ccs.getCids(from, to, "B03DE", 0, 200)).thenReturn(Mono.just(CidsPage(listOf("libra1", "libra2"), 0, 200, 2, 1, false)))
+    val error = IllegalStateException("Libra CPR unavailable")
+    `when`(enrichment.enrichLibraDefendant("libra1")).thenThrow(error)
+
+    assertSame(error, assertThrows(IllegalStateException::class.java) { service.enrichDefendants() })
+
+    val order = inOrder(enrichment)
+    order.verify(enrichment).enrichLibraDefendant("libra1")
+    verifyNoMoreInteractions(enrichment)
   }
 
   @Test
