@@ -52,7 +52,8 @@ class DefendantEnrichmentWorkflowTest {
   }
 
   @Test
-  fun `job enriches Common Platform and Libra using separate CPR lookups without persistence`() {
+  fun `job enriches both sources and posts one clean result per target`() {
+    server.stubFor(post(urlEqualTo("/enrichment-results")).willReturn(aResponse().withStatus(204)))
     server.stubFor(
       get(urlPathEqualTo("/enrichment-targets/defendant-ids"))
         .willReturn(
@@ -98,6 +99,7 @@ class DefendantEnrichmentWorkflowTest {
       EnrichmentTargetService(CourtCaseServiceClient(webClient, timeout)),
       Clock.fixed(Instant.parse("2026-10-14T04:00:00Z"), ZoneOffset.UTC),
       enrichment,
+      CourtCaseServiceClient(webClient, timeout),
     )
 
     val result = job.enrichDefendants()
@@ -122,7 +124,7 @@ class DefendantEnrichmentWorkflowTest {
         .withQueryParam("courtCode", equalTo("B03DE")),
     )
     server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
-    assertEquals(5, server.allServeEvents.size)
+    assertEquals(7, server.allServeEvents.size)
     assertTrue(
       server.allServeEvents.filter { it.request.url.startsWith("/enrichment-targets/") }
         .all { it.request.queryParameter("courtCode").firstValue() == "B03DE" },
@@ -130,7 +132,40 @@ class DefendantEnrichmentWorkflowTest {
     server.verify(1, getRequestedFor(urlEqualTo("/person/commonplatform/cp-123")))
     server.verify(1, getRequestedFor(urlEqualTo("/person/libra/libra-123")))
     server.verify(1, postRequestedFor(urlEqualTo("/search")))
-    server.verify(0, postRequestedFor(urlEqualTo("/enrichment-results")))
+    assertEquals(2L, result.persistedResults)
+    server.verify(2, postRequestedFor(urlEqualTo("/enrichment-results")))
+    server.verify(
+      1,
+      postRequestedFor(urlEqualTo("/enrichment-results")).withRequestBody(
+        equalToJson(
+          """
+          {
+            "sourceType":"COMMON_PLATFORM", "targetId":"cp-123", "status":"ENRICHED",
+            "jobRunId":"${result.runId}", "enrichedBy":"court-case-enrichment-worker",
+            "defendant":{"cprUUID":"record-cp","name":{"forename1":"Alex"},"dateOfBirth":"1990-01-02"},
+            "offender":{"crn":"X123","pnc":"pnc"},
+            "probation":{"probationStatus":"CURRENT","awaitingPsr":true,"breach":true,"preSentenceActivity":false},
+            "groupedOffenderMatches":{"matches":[{
+              "matchIdentifiers":{"crn":"X123","pnc":"pnc"},
+              "matchType":"NAME_DOB_ALIAS","confirmed":false,"rejected":false
+            }]}
+          }
+          """.trimIndent(),
+          true,
+          true,
+        ),
+      ),
+    )
+    server.verify(
+      1,
+      postRequestedFor(urlEqualTo("/enrichment-results")).withRequestBody(
+        equalToJson(
+          """{"sourceType":"LIBRA","targetId":"libra-123","status":"ENRICHED","jobRunId":"${result.runId}","defendant":{"cprUUID":"record-libra"}}""",
+          true,
+          true,
+        ),
+      ),
+    )
 
     val results = result.results
 
@@ -146,8 +181,8 @@ class DefendantEnrichmentWorkflowTest {
     server.verify(1, getRequestedFor(urlEqualTo("/person/commonplatform/cp-123")))
     server.verify(1, getRequestedFor(urlEqualTo("/person/libra/libra-123")))
     server.verify(1, postRequestedFor(urlEqualTo("/search")))
-    server.verify(0, postRequestedFor(urlEqualTo("/enrichment-results")))
+    server.verify(2, postRequestedFor(urlEqualTo("/enrichment-results")))
     server.verify(0, postRequestedFor(urlEqualTo("/match")))
-    assertEquals(5, server.allServeEvents.size)
+    assertEquals(7, server.allServeEvents.size)
   }
 }

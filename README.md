@@ -136,8 +136,10 @@ and Libra cIDs from CCS for 14 days starting today: `fromDate` is today
 Successful invocations return HTTP 200 with status
 `ENRICHMENT_COMPLETED`, fetched and processed counts for both sources, court
 code `B03DE`, and a `results` array containing Common Platform and Libra enrichment
-results. Persisted and failed counts remain zero. No persistence calls are made by the job.
-CCS target-fetch and enrichment failures fail the job with a non-2xx response.
+results. `persistedResults` counts results acknowledged by CCS; failed counts are zero
+on successful runs. Each target is enriched and then posted to CCS before the next
+target is processed, including `NO_MATCH` and `NEEDS_REVIEW` outcomes.
+CCS target-fetch, enrichment, and persistence failures fail the job with a non-2xx response.
 
 The enrichment implementation processes Common Platform and then Libra targets synchronously
 using `DefendantEnrichmentService`,
@@ -157,9 +159,9 @@ matching the existing CCM behavior.
 Downstream errors, empty successful response bodies, invalid dates, blank CRNs,
 and inconsistent exact-match identifiers fail the job instead of becoming
 `NO_MATCH`. Processing stops on the first error and the endpoint returns a
-non-2xx response. On successful runs, failed and persisted counts are zero.
-Results are returned to the caller only; they are not stored.
-Do not enable a scheduled CronJob until persistence is implemented and the
+non-2xx response. Earlier acknowledged writes are not rolled back if a later target
+fails. Results are also returned to the caller on successful runs.
+Do not enable a scheduled CronJob until CCS persistence is implemented and the
 CCS update contract is agreed. An eventual HTTP caller should treat non-2xx responses as job failures
 (for example, use `curl --fail-with-body`).
 
@@ -262,8 +264,9 @@ other HTTP errors and malformed/empty responses are propagated.
 posts one clean result per target using the same CCS service OAuth registration.
 The proposed path is **`POST /enrichment-results`**, configurable with
 `COURT_CASE_SERVICE_POST_ENRICHMENT_URL`. This endpoint and request schema are
-drafts: CCS has not implemented or agreed them yet. The batch job does not call
-this method.
+drafts: CCS has not implemented or agreed them yet. The batch job now calls
+this method immediately after enriching each target. Until CCS implements the
+endpoint, a non-empty run will fail at its first rejected persistence request.
 
 The request distinguishes `COMMON_PLATFORM` defendant IDs from `LIBRA` cIDs
 using `sourceType` and `targetId`. It carries an enrichment status, normalized
@@ -279,7 +282,7 @@ Writes have a 10-second timeout and **no automatic retries** because CCS write
 idempotency is not defined. A timeout may mean the write succeeded at CCS; do not
 blindly replay it.
 
-Before enabling persistence, agree the endpoint, accepted statuses, null/omitted
+Before production use, agree the endpoint, accepted statuses, null/omitted
 field semantics (preserve versus clear), missing-CPR behavior, protection of
 existing confirmed matches, and idempotency with CCS. In particular, the current
 `CprService` preserves existing date of birth and address when CPR supplies no

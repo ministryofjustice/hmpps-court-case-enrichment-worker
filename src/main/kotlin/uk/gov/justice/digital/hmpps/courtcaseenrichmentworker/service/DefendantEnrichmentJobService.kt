@@ -3,7 +3,9 @@ package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.service
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.resource.model.DefendantEnrichmentJobResult
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CourtCaseServiceClient
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.ServiceCallSummary
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase.toPersistenceRequest
 import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
@@ -13,6 +15,7 @@ class DefendantEnrichmentJobService(
   private val enrichmentTargetService: EnrichmentTargetService,
   private val clock: Clock,
   private val defendantEnrichmentService: DefendantEnrichmentService,
+  private val courtCaseServiceClient: CourtCaseServiceClient,
 ) {
   fun enrichDefendants(): DefendantEnrichmentJobResult {
     val courtCode = POC_COURT_CODE
@@ -44,14 +47,22 @@ class DefendantEnrichmentJobService(
       cidsFetched.size,
     )
 
-    val results = defendantIdsFetched.map(defendantEnrichmentService::enrichCommonPlatformDefendant) +
-      cidsFetched.map(defendantEnrichmentService::enrichLibraDefendant)
+    val results = defendantIdsFetched.map { defendantId ->
+      defendantEnrichmentService.enrichCommonPlatformDefendant(defendantId).also {
+        courtCaseServiceClient.persistEnrichmentResult(it.toPersistenceRequest(runId)).block()
+      }
+    } + cidsFetched.map { cId ->
+      defendantEnrichmentService.enrichLibraDefendant(cId).also {
+        courtCaseServiceClient.persistEnrichmentResult(it.toPersistenceRequest(runId)).block()
+      }
+    }
 
     log.info(
-      "Completed defendant enrichment runId={} defendantIdsProcessed={} cidsProcessed={}",
+      "Completed defendant enrichment runId={} defendantIdsProcessed={} cidsProcessed={} persistedResults={}",
       runId,
       defendantIdsFetched.size,
       cidsFetched.size,
+      results.size,
     )
 
     return DefendantEnrichmentJobResult(
@@ -64,7 +75,7 @@ class DefendantEnrichmentJobService(
       cidsFetched = cidsFetched.size.toLong(),
       defendantIdsProcessed = defendantIdsFetched.size.toLong(),
       cidsProcessed = cidsFetched.size.toLong(),
-      persistedResults = 0,
+      persistedResults = results.size.toLong(),
       failedResults = 0,
       results = results,
     )

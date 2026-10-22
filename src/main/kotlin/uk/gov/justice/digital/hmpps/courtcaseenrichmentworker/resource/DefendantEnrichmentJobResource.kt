@@ -23,8 +23,8 @@ class DefendantEnrichmentJobResource(
       "for court B03DE for the POC; no court-code parameter is accepted. " +
       "No authentication is required; access must be restricted by network controls. " +
       "Common Platform and Libra targets are enriched synchronously using separate CPR lookups and Offender Search. " +
-      "No persistence calls are made.",
+      "Each clean enrichment result is posted individually to CCS for persistence.",
   )
-  @ApiResponse(responseCode = "200", description = "Defendant enrichment completed without persistence")
+  @ApiResponse(responseCode = "200", description = "Defendant enrichment completed and acknowledged by CCS")
   fun enrichDefendants(): DefendantEnrichmentJobResult = defendantEnrichmentJobService.enrichDefendants()
 }
