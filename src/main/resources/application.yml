@@ -90,6 +90,7 @@ person-record-service:
 court-case-service:
   base-url: ${COURT_CASE_SERVICE_BASE_URL}
   timeout: 10s
+  persistence-timeout: ${COURT_CASE_SERVICE_PERSISTENCE_TIMEOUT:60s}
   post-enrichment-url: ${COURT_CASE_SERVICE_POST_ENRICHMENT_URL:/enrichment-results}
 
 offender-search:
