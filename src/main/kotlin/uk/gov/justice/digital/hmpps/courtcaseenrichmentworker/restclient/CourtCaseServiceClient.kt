@@ -49,15 +49,25 @@ class CourtCaseServiceClient(
 
   private fun logPersistenceFailure(body: PersistEnrichmentResultRequest, error: WebClientResponseException) {
     val responseText = error.responseBodyAsString.replace("\\\"", "\"")
+    val validationFields = VALIDATION_FIELD.findAll(responseText)
+      .map { it.groupValues[1].replace(ARRAY_INDEX, "[]") }
+      .filter { it in VALIDATION_PATHS }
+      .distinct()
+      .toList()
+    val constraintCodes = VALIDATION_CODES.findAll(responseText).map { it.groupValues[1] }.toList()
     log.warn(
-      "CCS persistence rejected runId={} sourceType={} enrichmentStatus={} httpStatus={} responseBytes={} responseErrorHints={} responseFieldHints={}",
+      "CCS persistence rejected runId={} sourceType={} enrichmentStatus={} httpStatus={} responseBytes={} responseErrorHints={} responseFieldHints={} responseValidationFields={} responseConstraintHints={}",
       body.jobRunId,
       body.sourceType,
       body.status,
       error.statusCode.value(),
       error.responseBodyAsByteArray.size,
       ERROR_HINTS.filter { responseText.contains(it, ignoreCase = true) },
-      FIELD_HINTS.filter { responseText.contains("\"$it\"") },
+      FIELD_HINTS.filter { responseText.contains("[\"$it\"]") },
+      validationFields,
+      CONSTRAINT_HINTS.filter { constraint ->
+        constraintCodes.any { codes -> Regex("""(?:^|,)\s*$constraint(?:[.,]|$)""").containsMatchIn(codes) }
+      },
     )
   }
 
@@ -129,6 +139,8 @@ class CourtCaseServiceClient(
       "must not be null",
       "must not be blank",
       "must not be empty",
+      "Validation failed",
+      "must match",
     )
     private val FIELD_HINTS = listOf(
       "sourceType", "targetId", "status", "defendant", "offender", "probation",
@@ -136,6 +148,22 @@ class CourtCaseServiceClient(
       "cprUUID", "name", "dateOfBirth", "sex", "address", "crn", "pnc", "cro",
       "probationStatus", "awaitingPsr", "breach", "previouslyKnownTerminationDate",
       "preSentenceActivity", "matches", "matchIdentifiers", "matchType", "confirmed", "rejected",
+    )
+    private val VALIDATION_FIELD = Regex("""on field '([^'\r\n]{1,256})'""")
+    private val ARRAY_INDEX = Regex("""\[\d+]""")
+    private val VALIDATION_CODES = Regex("""codes \[([^\]\r\n]{1,4096})]""")
+    private val CONSTRAINT_HINTS = listOf("Pattern", "NotBlank", "NotNull", "NotEmpty", "Size", "Valid")
+    private val VALIDATION_PATHS = setOf(
+      "sourceType", "targetId", "status", "defendant", "offender", "probation",
+      "groupedOffenderMatches", "warnings", "errors", "enrichedBy", "jobRunId",
+      "defendant.cprUUID", "defendant.name", "defendant.dateOfBirth", "defendant.sex", "defendant.address",
+      "offender.crn", "offender.pnc", "offender.cro",
+      "probation.probationStatus", "probation.awaitingPsr", "probation.breach",
+      "probation.previouslyKnownTerminationDate", "probation.preSentenceActivity",
+      "groupedOffenderMatches.matches", "groupedOffenderMatches.matches[]",
+      "groupedOffenderMatches.matches[].matchIdentifiers", "groupedOffenderMatches.matches[].matchIdentifiers.crn",
+      "groupedOffenderMatches.matches[].matchType", "groupedOffenderMatches.matches[].confirmed",
+      "groupedOffenderMatches.matches[].rejected",
     )
   }
 }

@@ -335,11 +335,55 @@ class CourtCaseServiceClientTest {
     assertThat(appender.list).hasSize(1)
     assertThat(appender.list.single().level).isEqualTo(Level.WARN)
     assertThat(appender.list.single().formattedMessage)
-      .contains("responseErrorHints=[JSON parse error, Cannot deserialize]", "responseFieldHints=[targetId, defendant, sex]")
+      .contains("responseErrorHints=[JSON parse error, Cannot deserialize]", "responseFieldHints=[defendant, sex]")
       .contains("responseBytes=${responseBody.toByteArray().size}")
       .doesNotContain("sensitive", "Sensitive Name", "1990-01-01", "forged-log-entry", "unknownField", "\r", "\n")
     assertThat(appender.list.single().throwableProxy).isNull()
     server.verify(1, postRequestedFor(urlEqualTo("/enrichment-results")))
+  }
+
+  @Test
+  fun `recognises Spring validation fields and constraints without logging rejected values`() {
+    val responseBody = """
+      {
+        "status":400,
+        "developerMessage":"Validation failed for argument [0]: [Field error in object 'enrichmentResultRequest' on field 'probation.probationStatus': rejected value [sensitive-status]; codes [Pattern.enrichmentResultRequest.probation.probationStatus,Pattern.probation.probationStatus,Pattern.java.lang.String,Pattern]; default message [must match sensitive-regex]] [Field error in object 'enrichmentResultRequest' on field 'defendant.sex': rejected value [sensitive-sex]; codes [Pattern.enrichmentResultRequest.defendant.sex,Pattern]; default message [must match sensitive-regex]] [Field error in object 'enrichmentResultRequest' on field 'groupedOffenderMatches.matches[42].matchIdentifiers.crn': rejected value [sensitive-crn]; codes [NotBlank.enrichmentResultRequest.crn,NotBlank]; default message [must not be blank]]",
+        "userMessage":"Field error in object 'enrichmentResultRequest' on field 'sensitive-field': rejected value [sensitive-value]; codes [sensitive-code]; default message [sensitive-message]\r\nforged-log-entry"
+      }
+    """.trimIndent()
+    server.stubFor(
+      post(urlEqualTo("/enrichment-results"))
+        .willReturn(aResponse().withStatus(400).withHeader("Content-Type", "application/json").withBody(responseBody)),
+    )
+
+    val error = assertThrows(WebClientResponseException.BadRequest::class.java) {
+      client.persistEnrichmentResult(persistenceRequest()).block()
+    }
+
+    assertEquals(responseBody, error.responseBodyAsString)
+    assertThat(appender.list).hasSize(1)
+    assertThat(appender.list.single().formattedMessage)
+      .contains("responseFieldHints=[]")
+      .contains("responseValidationFields=[probation.probationStatus, defendant.sex, groupedOffenderMatches.matches[].matchIdentifiers.crn]")
+      .contains("responseConstraintHints=[Pattern, NotBlank]", "Validation failed", "must match")
+      .doesNotContain("sensitive", "forged-log-entry", "matches[42]", "\r", "\n")
+    assertThat(appender.list.single().throwableProxy).isNull()
+    server.verify(1, postRequestedFor(urlEqualTo("/enrichment-results")))
+  }
+
+  @Test
+  fun `does not mistake the error envelope status for a rejected field`() {
+    server.stubFor(
+      post(urlEqualTo("/enrichment-results"))
+        .willReturn(aResponse().withStatus(400).withBody("""{"status":400,"developerMessage":"unrecognised error"}""")),
+    )
+
+    assertThrows(WebClientResponseException.BadRequest::class.java) {
+      client.persistEnrichmentResult(persistenceRequest()).block()
+    }
+
+    assertThat(appender.list.single().formattedMessage)
+      .contains("responseFieldHints=[]", "responseValidationFields=[]", "responseConstraintHints=[]")
   }
 
   @Test
