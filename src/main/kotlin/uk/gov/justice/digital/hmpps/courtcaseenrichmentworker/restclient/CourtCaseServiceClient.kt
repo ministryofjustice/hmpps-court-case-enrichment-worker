@@ -1,11 +1,13 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient
 
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.client.web.reactive.function.client.ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientResponseException
 import reactor.core.publisher.Mono
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase.CidsPage
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase.DefendantIdsPage
@@ -36,11 +38,28 @@ class CourtCaseServiceClient(
         if (response.statusCode().is2xxSuccessful) {
           response.releaseBody()
         } else {
-          response.createException().flatMap { Mono.error<Void>(it) }
+          response.createException().flatMap {
+            logPersistenceFailure(body, it)
+            Mono.error<Void>(it)
+          }
         }
       }
   }
     .timeout(timeout)
+
+  private fun logPersistenceFailure(body: PersistEnrichmentResultRequest, error: WebClientResponseException) {
+    val responseText = error.responseBodyAsString.replace("\\\"", "\"")
+    log.warn(
+      "CCS persistence rejected runId={} sourceType={} enrichmentStatus={} httpStatus={} responseBytes={} responseErrorHints={} responseFieldHints={}",
+      body.jobRunId,
+      body.sourceType,
+      body.status,
+      error.statusCode.value(),
+      error.responseBodyAsByteArray.size,
+      ERROR_HINTS.filter { responseText.contains(it, ignoreCase = true) },
+      FIELD_HINTS.filter { responseText.contains("\"$it\"") },
+    )
+  }
 
   fun getDefendantIds(
     fromDate: LocalDate,
@@ -90,4 +109,33 @@ class CourtCaseServiceClient(
   }
     .timeout(timeout)
     .retryWhen(serviceClientRetry("Court Case Service"))
+
+  companion object {
+    private val log = LoggerFactory.getLogger(CourtCaseServiceClient::class.java)
+
+    // Emit only fixed hints: downstream messages can include rejected personal data.
+    private val ERROR_HINTS = listOf(
+      "HttpMessageNotReadableException",
+      "InvalidFormatException",
+      "MismatchedInputException",
+      "MissingKotlinParameterException",
+      "UnrecognizedPropertyException",
+      "MethodArgumentNotValidException",
+      "ConstraintViolationException",
+      "JSON parse error",
+      "Cannot deserialize",
+      "Unrecognized field",
+      "Missing required",
+      "must not be null",
+      "must not be blank",
+      "must not be empty",
+    )
+    private val FIELD_HINTS = listOf(
+      "sourceType", "targetId", "status", "defendant", "offender", "probation",
+      "groupedOffenderMatches", "warnings", "errors", "enrichedBy", "jobRunId",
+      "cprUUID", "name", "dateOfBirth", "sex", "address", "crn", "pnc", "cro",
+      "probationStatus", "awaitingPsr", "breach", "previouslyKnownTerminationDate",
+      "preSentenceActivity", "matches", "matchIdentifiers", "matchType", "confirmed", "rejected",
+    )
+  }
 }

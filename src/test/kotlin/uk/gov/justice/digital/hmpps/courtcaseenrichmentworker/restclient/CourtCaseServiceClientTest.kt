@@ -1,5 +1,9 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
@@ -11,6 +15,7 @@ import com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -20,6 +25,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
+import org.slf4j.LoggerFactory
 import org.springframework.core.codec.DecodingException
 import org.springframework.security.oauth2.client.InMemoryOAuth2AuthorizedClientService
 import org.springframework.security.oauth2.client.registration.ClientRegistration
@@ -49,9 +55,16 @@ class CourtCaseServiceClientTest {
   private val fromDate = LocalDate.of(2026, 10, 9)
   private val toDate = LocalDate.of(2026, 10, 23)
   private lateinit var client: CourtCaseServiceClient
+  private val logger = LoggerFactory.getLogger(CourtCaseServiceClient::class.java) as Logger
+  private val appender = ListAppender<ILoggingEvent>()
+  private var originalLevel: Level? = null
 
   @BeforeEach
   fun startServer() {
+    originalLevel = logger.level
+    logger.level = Level.WARN
+    appender.start()
+    logger.addAppender(appender)
     server.start()
     server.stubFor(
       post(urlEqualTo("/oauth/token")).willReturn(
@@ -64,6 +77,9 @@ class CourtCaseServiceClientTest {
 
   @AfterEach
   fun stopServer() {
+    logger.level = originalLevel
+    logger.detachAppender(appender)
+    appender.stop()
     server.stop()
   }
 
@@ -270,6 +286,7 @@ class CourtCaseServiceClientTest {
     client.persistEnrichmentResult(persistenceRequest()).block()
 
     server.verify(1, postRequestedFor(urlEqualTo("/enrichment-results")))
+    assertThat(appender.list).isEmpty()
   }
 
   @ParameterizedTest
@@ -287,6 +304,55 @@ class CourtCaseServiceClientTest {
     assertEquals(status, error.statusCode.value())
     assertEquals("write rejected", error.responseBodyAsString)
     server.verify(1, postRequestedFor(urlEqualTo("/enrichment-results")))
+    assertThat(appender.list).hasSize(1)
+    assertThat(appender.list.single().formattedMessage)
+      .contains("CCS persistence rejected", "runId=run-123", "sourceType=COMMON_PLATFORM", "enrichmentStatus=ENRICHED", "httpStatus=$status")
+      .contains("responseBytes=14", "responseErrorHints=[]", "responseFieldHints=[]")
+      .doesNotContain("write rejected", "target-123")
+    assertThat(appender.list.single().throwableProxy).isNull()
+  }
+
+  @Test
+  fun `logs only allowlisted response hints without leaking rejected values`() {
+    val responseBody = """
+      {
+        "developerMessage": "JSON parse error: Cannot deserialize value at [\"defendant\"][\"sex\"] from sensitive-value\r\nforged-log-entry",
+        "userMessage": "Sensitive Name, 1990-01-01",
+        "targetId": "sensitive-target",
+        "unknownField": "sensitive-details"
+      }
+    """.trimIndent()
+    server.stubFor(
+      post(urlEqualTo("/enrichment-results"))
+        .willReturn(aResponse().withStatus(400).withHeader("Content-Type", "application/json").withBody(responseBody)),
+    )
+
+    val error = assertThrows(WebClientResponseException::class.java) {
+      client.persistEnrichmentResult(persistenceRequest().copy(targetId = "sensitive-target")).block()
+    }
+
+    assertEquals(responseBody, error.responseBodyAsString)
+    assertThat(appender.list).hasSize(1)
+    assertThat(appender.list.single().level).isEqualTo(Level.WARN)
+    assertThat(appender.list.single().formattedMessage)
+      .contains("responseErrorHints=[JSON parse error, Cannot deserialize]", "responseFieldHints=[targetId, defendant, sex]")
+      .contains("responseBytes=${responseBody.toByteArray().size}")
+      .doesNotContain("sensitive", "Sensitive Name", "1990-01-01", "forged-log-entry", "unknownField", "\r", "\n")
+    assertThat(appender.list.single().throwableProxy).isNull()
+    server.verify(1, postRequestedFor(urlEqualTo("/enrichment-results")))
+  }
+
+  @Test
+  fun `logs empty rejection bodies without changing the failure`() {
+    server.stubFor(post(urlEqualTo("/enrichment-results")).willReturn(aResponse().withStatus(400)))
+
+    val error = assertThrows(WebClientResponseException.BadRequest::class.java) {
+      client.persistEnrichmentResult(persistenceRequest()).block()
+    }
+
+    assertThat(error.responseBodyAsByteArray).isEmpty()
+    assertThat(appender.list.single().formattedMessage)
+      .contains("httpStatus=400", "responseBytes=0", "responseErrorHints=[]", "responseFieldHints=[]")
   }
 
   @Test
