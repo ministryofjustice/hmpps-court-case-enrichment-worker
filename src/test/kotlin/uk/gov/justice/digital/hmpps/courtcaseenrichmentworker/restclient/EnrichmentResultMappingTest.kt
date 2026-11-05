@@ -1,7 +1,12 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.NullSource
+import org.junit.jupiter.params.provider.ValueSource
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedAddress
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedAlias
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedDefendant
@@ -49,8 +54,9 @@ class EnrichmentResultMappingTest {
     val request = result.toPersistenceRequest("run")
 
     assertThat(request).usingRecursiveComparison()
-      .ignoringFields("enrichedBy", "jobRunId")
+      .ignoringFields("enrichedBy", "jobRunId", "defendant.sex")
       .isEqualTo(result)
+    assertThat(request.defendant?.sex).isEqualTo("FEMALE")
     assertThat(request.enrichedBy).isEqualTo("court-case-enrichment-worker")
     assertThat(request.jobRunId).isEqualTo("run")
   }
@@ -63,4 +69,43 @@ class EnrichmentResultMappingTest {
       .ignoringFields("enrichedBy", "jobRunId")
       .isEqualTo(result)
   }
+
+  @ParameterizedTest
+  @CsvSource(
+    "Male,MALE", "male,MALE", "M,MALE",
+    "Female,FEMALE", "female,FEMALE", "f,FEMALE",
+    "Not Known,NOT_KNOWN", "NOT_KNOWN,NOT_KNOWN", "n,NOT_KNOWN",
+    "Not Specified,NOT_SPECIFIED", "NOT_SPECIFIED,NOT_SPECIFIED", "ns,NOT_SPECIFIED",
+    "'  Not known  ',NOT_KNOWN",
+  )
+  fun `maps recognised descriptions and codes to CCS enum names`(sex: String, expected: String) {
+    val result = resultWithSex(sex)
+
+    val request = result.toPersistenceRequest("run")
+
+    assertThat(request.defendant?.sex).isEqualTo(expected)
+    assertThat(expected).matches("(?i)MALE|M|FEMALE|F|NOT_KNOWN|N|NOT_SPECIFIED|NS")
+    assertThat(result.defendant?.sex).isEqualTo(sex)
+  }
+
+  @ParameterizedTest
+  @NullSource
+  fun `preserves an absent sex`(sex: String?) {
+    assertThat(resultWithSex(sex).toPersistenceRequest("run").defendant?.sex).isNull()
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = ["", " ", "sensitive-unrecognised-value"])
+  fun `rejects unsupported sex without exposing the value`(sex: String) {
+    assertThatThrownBy { resultWithSex(sex).toPersistenceRequest("run") }
+      .isInstanceOf(IllegalArgumentException::class.java)
+      .hasMessage("Cannot persist defendant.sex: unsupported value")
+  }
+
+  private fun resultWithSex(sex: String?) = EnrichmentResult(
+    EnrichmentSourceType.COMMON_PLATFORM,
+    "cp",
+    EnrichmentStatus.ENRICHED,
+    defendant = EnrichedDefendant(name = EnrichedName(null, "First", null, "Last"), sex = sex),
+  )
 }
