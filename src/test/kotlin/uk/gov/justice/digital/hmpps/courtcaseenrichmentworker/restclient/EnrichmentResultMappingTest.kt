@@ -1,12 +1,18 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.NullSource
 import org.junit.jupiter.params.provider.ValueSource
+import org.slf4j.LoggerFactory
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedAddress
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedAlias
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedDefendant
@@ -23,6 +29,25 @@ import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.c
 import java.time.LocalDate
 
 class EnrichmentResultMappingTest {
+  private val logger = LoggerFactory.getLogger("EnrichmentResultMapping") as Logger
+  private val appender = ListAppender<ILoggingEvent>()
+  private var originalLevel: Level? = null
+
+  @BeforeEach
+  fun attachAppender() {
+    originalLevel = logger.level
+    logger.level = Level.ERROR
+    appender.start()
+    logger.addAppender(appender)
+  }
+
+  @AfterEach
+  fun detachAppender() {
+    logger.level = originalLevel
+    logger.detachAppender(appender)
+    appender.stop()
+  }
+
   @Test
   fun `maps every clean result field without losing nulls flags dates or aliases`() {
     val result = EnrichmentResult(
@@ -86,20 +111,28 @@ class EnrichmentResultMappingTest {
     assertThat(request.defendant?.sex).isEqualTo(expected)
     assertThat(expected).matches("(?i)MALE|M|FEMALE|F|NOT_KNOWN|N|NOT_SPECIFIED|NS")
     assertThat(result.defendant?.sex).isEqualTo(sex)
+    assertThat(appender.list).isEmpty()
   }
 
   @ParameterizedTest
   @NullSource
   fun `preserves an absent sex`(sex: String?) {
     assertThat(resultWithSex(sex).toPersistenceRequest("run").defendant?.sex).isNull()
+    assertThat(appender.list).isEmpty()
   }
 
   @ParameterizedTest
-  @ValueSource(strings = ["", " ", "sensitive-unrecognised-value"])
-  fun `rejects unsupported sex without exposing the value`(sex: String) {
-    assertThatThrownBy { resultWithSex(sex).toPersistenceRequest("run") }
-      .isInstanceOf(IllegalArgumentException::class.java)
-      .hasMessage("Cannot persist defendant.sex: unsupported value")
+  @ValueSource(strings = ["", " ", "sensitive-unrecognised-value", "sensitive\r\nforged-log-entry"])
+  fun `maps unsupported sex to not known and logs without exposing the value`(sex: String) {
+    val result = resultWithSex(sex)
+
+    assertThat(result.toPersistenceRequest("run").defendant?.sex).isEqualTo("NOT_KNOWN")
+    assertThat(result.defendant?.sex).isEqualTo(sex)
+    assertThat(appender.list).hasSize(1)
+    assertThat(appender.list.single().level).isEqualTo(Level.ERROR)
+    assertThat(appender.list.single().formattedMessage)
+      .isEqualTo("Unrecognised defendant.sex mapped to NOT_KNOWN runId=run sourceType=COMMON_PLATFORM")
+    assertThat(appender.list.single().throwableProxy).isNull()
   }
 
   private fun resultWithSex(sex: String?) = EnrichmentResult(
