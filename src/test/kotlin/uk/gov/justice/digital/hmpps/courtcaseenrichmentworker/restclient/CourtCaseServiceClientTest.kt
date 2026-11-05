@@ -27,12 +27,16 @@ import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import org.slf4j.LoggerFactory
 import org.springframework.core.codec.DecodingException
+import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.client.InMemoryOAuth2AuthorizedClientService
 import org.springframework.security.oauth2.client.registration.ClientRegistration
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository
 import org.springframework.security.oauth2.core.AuthorizationGrantType
+import org.springframework.web.reactive.function.client.ClientResponse
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
+import reactor.core.publisher.Mono
+import reactor.test.StepVerifier
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.config.CourtCaseServiceWebClientConfiguration
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
@@ -429,9 +433,39 @@ class CourtCaseServiceClientTest {
   }
 
   @Test
+  fun `default persistence timeout allows a response after 59 seconds`() {
+    StepVerifier.withVirtualTime {
+      val webClient = WebClient.builder()
+        .exchangeFunction {
+          Mono.delay(Duration.ofSeconds(59))
+            .thenReturn(ClientResponse.create(HttpStatus.NO_CONTENT).build())
+        }
+        .build()
+      CourtCaseServiceClient(webClient, Duration.ofSeconds(10))
+        .persistEnrichmentResult(persistenceRequest())
+    }
+      .thenAwait(Duration.ofSeconds(59))
+      .verifyComplete()
+  }
+
+  @Test
+  fun `default persistence timeout expires after 60 seconds`() {
+    StepVerifier.withVirtualTime {
+      val webClient = WebClient.builder().exchangeFunction { Mono.never() }.build()
+      CourtCaseServiceClient(webClient, Duration.ofSeconds(10))
+        .persistEnrichmentResult(persistenceRequest())
+    }
+      .expectSubscription()
+      .expectNoEvent(Duration.ofSeconds(59))
+      .thenAwait(Duration.ofSeconds(1))
+      .expectError(TimeoutException::class.java)
+      .verify()
+  }
+
+  @Test
   fun `times out writes without retrying a potentially completed update`() {
     stubResponse("/enrichment-targets/cids", """{"cIds":[],"page":0,"size":200,"totalElements":0,"totalPages":0,"hasNext":false}""")
-    createClient(Duration.ofMillis(500))
+    createClient(persistenceTimeout = Duration.ofMillis(500))
     client.getCids(fromDate, toDate).block()
     server.resetRequests()
     server.stubFor(
@@ -458,7 +492,11 @@ class CourtCaseServiceClientTest {
     )
   }
 
-  private fun createClient(timeout: Duration = Duration.ofSeconds(10), postEnrichmentUrl: String = "/enrichment-results") {
+  private fun createClient(
+    timeout: Duration = Duration.ofSeconds(10),
+    postEnrichmentUrl: String = "/enrichment-results",
+    persistenceTimeout: Duration = Duration.ofSeconds(60),
+  ) {
     val registration = ClientRegistration.withRegistrationId("court-case-service-client")
       .clientId("worker-client")
       .clientSecret("test-secret")
@@ -471,6 +509,6 @@ class CourtCaseServiceClientTest {
       repository,
       InMemoryOAuth2AuthorizedClientService(repository),
     )
-    client = CourtCaseServiceClient(configuration.courtCaseServiceWebClient(WebClient.builder()), timeout, postEnrichmentUrl)
+    client = CourtCaseServiceClient(configuration.courtCaseServiceWebClient(WebClient.builder()), timeout, postEnrichmentUrl, persistenceTimeout)
   }
 }

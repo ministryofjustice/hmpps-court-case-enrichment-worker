@@ -20,6 +20,7 @@ class CourtCaseServiceClient(
   @param:Qualifier("courtCaseServiceWebClient") private val webClient: WebClient,
   @param:Value("\${court-case-service.timeout:10s}") private val timeout: Duration,
   @param:Value("\${court-case-service.post-enrichment-url:/enrichment-results}") private val postEnrichmentUrl: String = "/enrichment-results",
+  @param:Value("\${court-case-service.persistence-timeout:60s}") private val persistenceTimeout: Duration = Duration.ofSeconds(60),
 ) {
   fun persistEnrichmentResult(body: PersistEnrichmentResultRequest): Mono<Void> = Mono.defer {
     require(body.targetId.isNotBlank()) { "targetId must not be blank" }
@@ -45,7 +46,7 @@ class CourtCaseServiceClient(
         }
       }
   }
-    .timeout(timeout)
+    .timeout(persistenceTimeout)
 
   private fun logPersistenceFailure(body: PersistEnrichmentResultRequest, error: WebClientResponseException) {
     val responseText = error.responseBodyAsString.replace("\\\"", "\"")
