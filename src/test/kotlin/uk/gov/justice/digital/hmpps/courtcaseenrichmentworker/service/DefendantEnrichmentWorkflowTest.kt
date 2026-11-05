@@ -72,14 +72,14 @@ class DefendantEnrichmentWorkflowTest {
       get(urlEqualTo("/person/commonplatform/cp-123"))
         .willReturn(
           aResponse().withHeader("Content-Type", "application/json")
-            .withBody("""{"cprUUID":"record-cp","firstName":"Alex","dateOfBirth":"1990-01-02","identifiers":{"crns":["X123"]}}"""),
+            .withBody("""{"cprUUID":"record-cp","firstName":"Alex","dateOfBirth":"1990-01-02","sex":{"description":"Not Known"},"identifiers":{"crns":["X123"]}}"""),
         ),
     )
     server.stubFor(
       get(urlEqualTo("/person/libra/libra-123"))
         .willReturn(
           aResponse().withHeader("Content-Type", "application/json")
-            .withBody("""{"cprUUID":"record-libra","firstName":"Libra","identifiers":{"crns":[]}}"""),
+            .withBody("""{"cprUUID":"record-libra","firstName":"Libra","sex":{"description":"Not Specified"},"identifiers":{"crns":[]}}"""),
         ),
     )
     server.stubFor(
@@ -142,7 +142,7 @@ class DefendantEnrichmentWorkflowTest {
           {
             "sourceType":"COMMON_PLATFORM", "targetId":"cp-123", "status":"ENRICHED",
             "jobRunId":"${result.runId}", "enrichedBy":"court-case-enrichment-worker",
-            "defendant":{"cprUUID":"record-cp","name":{"forename1":"Alex"},"dateOfBirth":"1990-01-02"},
+            "defendant":{"cprUUID":"record-cp","name":{"forename1":"Alex"},"dateOfBirth":"1990-01-02","sex":"NOT_KNOWN"},
             "offender":{"crn":"X123","pnc":"pnc"},
             "probation":{"probationStatus":"CURRENT","awaitingPsr":true,"breach":true,"preSentenceActivity":false},
             "groupedOffenderMatches":{"matches":[{
@@ -160,7 +160,7 @@ class DefendantEnrichmentWorkflowTest {
       1,
       postRequestedFor(urlEqualTo("/enrichment-results")).withRequestBody(
         equalToJson(
-          """{"sourceType":"LIBRA","targetId":"libra-123","status":"ENRICHED","jobRunId":"${result.runId}","defendant":{"cprUUID":"record-libra"}}""",
+          """{"sourceType":"LIBRA","targetId":"libra-123","status":"ENRICHED","jobRunId":"${result.runId}","defendant":{"cprUUID":"record-libra","sex":"NOT_SPECIFIED"}}""",
           true,
           true,
         ),
@@ -172,6 +172,8 @@ class DefendantEnrichmentWorkflowTest {
     assertEquals(listOf(EnrichmentSourceType.COMMON_PLATFORM, EnrichmentSourceType.LIBRA), results.map { it.sourceType })
     assertEquals(listOf(EnrichmentStatus.ENRICHED, EnrichmentStatus.ENRICHED), results.map { it.status })
     assertEquals("record-cp", results.first().defendant?.cprUUID)
+    assertEquals("Not Known", results.first().defendant?.sex)
+    assertEquals("Not Specified", results.last().defendant?.sex)
     assertEquals("X123", results.first().offender?.crn)
     assertEquals("pnc", results.first().offender?.pnc)
     assertEquals("CURRENT", results.first().probation?.probationStatus)
