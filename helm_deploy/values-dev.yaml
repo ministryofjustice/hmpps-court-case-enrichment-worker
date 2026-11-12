@@ -6,6 +6,7 @@ generic-service:
 
   ingress:
     host: court-case-enrichment-worker-dev.hmpps.service.justice.gov.uk
+    tlsSecretName: court-probation-dev-cert-secret
     # modsecurity_enabled: true
 
   env:
