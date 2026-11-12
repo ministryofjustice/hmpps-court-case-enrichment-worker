@@ -12,11 +12,26 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.method.annotation.HandlerMethodValidationException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 import uk.gov.justice.hmpps.kotlin.common.ErrorResponse
 
 @RestControllerAdvice
 class CourtCaseEnrichmentWorkerExceptionHandler {
+  @ExceptionHandler(HandlerMethodValidationException::class)
+  fun handleMethodValidationException(e: HandlerMethodValidationException): ResponseEntity<ErrorResponse> {
+    if (e.isForReturnValue) return handleException(e)
+    return ResponseEntity
+      .status(BAD_REQUEST)
+      .body(
+        ErrorResponse(
+          status = BAD_REQUEST,
+          userMessage = "Validation failure: identifier must not be blank",
+          developerMessage = "Identifier must not be blank",
+        ),
+      ).also { log.info("Request parameter validation failed") }
+  }
+
   @ExceptionHandler(ValidationException::class)
   fun handleValidationException(e: ValidationException): ResponseEntity<ErrorResponse> = ResponseEntity
     .status(BAD_REQUEST)
