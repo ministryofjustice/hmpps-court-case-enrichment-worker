@@ -26,6 +26,7 @@ internal fun serviceOAuthWebClient(
   val registrationAttributes = mutableMapOf<String, Any>()
   ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId(registrationId).accept(registrationAttributes)
   return builder.baseUrl(baseUrl)
+    .filter(downstreamRequestLogging(registrationId))
     // Spring's servlet filter cannot acquire a token without a servlet request.
     .filter { request, next ->
       if (!request.attributes().entries.containsAll(registrationAttributes.entries)) {
