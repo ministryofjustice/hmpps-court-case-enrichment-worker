@@ -37,7 +37,7 @@ class DefendantEnrichmentService(
   private fun enrich(source: EnrichmentSourceType, targetId: String, person: CprDefendant?): EnrichmentResult {
     if (person == null) {
       log.debug("No CPR record found for enrichment source={}", source)
-      return EnrichmentResult(source, targetId, EnrichmentStatus.NO_MATCH)
+      return EnrichmentResult(source, targetId, EnrichmentStatus.NO_MATCH).also(::logEnrichmentResult)
     }
 
     val defendant = mapDefendant(person)
@@ -83,6 +83,31 @@ class DefendantEnrichmentService(
       probation = probation,
       groupedOffenderMatches = matches.takeIf { it.isNotEmpty() }?.let(::EnrichedGroupedOffenderMatches),
       warnings = warnings,
+    ).also(::logEnrichmentResult)
+  }
+
+  private fun logEnrichmentResult(result: EnrichmentResult) {
+    val matches = result.groupedOffenderMatches?.matches?.map {
+      mapOf(
+        "crn" to it.matchIdentifiers.crn,
+        "pnc" to it.matchIdentifiers.pnc,
+        "cro" to it.matchIdentifiers.cro,
+        "matchType" to it.matchType,
+        "confirmed" to it.confirmed,
+        "rejected" to it.rejected,
+      )
+    }
+    log.info(
+      "Enrichment result source={} targetId={} status={} cprUUID={} offender={} probation={} matches={} warnings={} errors={}",
+      result.sourceType,
+      result.targetId,
+      result.status,
+      result.defendant?.cprUUID,
+      result.offender,
+      result.probation,
+      matches,
+      result.warnings,
+      result.errors,
     )
   }
 
