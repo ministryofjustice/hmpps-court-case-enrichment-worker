@@ -53,7 +53,7 @@ class CprServiceClientTest {
         ),
     )
 
-    val result = client.getCprCanonicalRecordByCommonPlatformId("defendant-123").block()
+    val result = client.getCommonPlatformPerson("defendant-123").block()
 
     assertEquals("record-123", result?.cprUUID)
     assertEquals("Alex", result?.firstName)
@@ -69,7 +69,7 @@ class CprServiceClientTest {
         .willReturn(aResponse().withStatus(404).withBody("""{"error":"not found"}""")),
     )
 
-    val result = client.getCprCanonicalRecordByLibraId("12345").block()
+    val result = client.getLibraPerson("12345").block()
 
     assertNull(result)
     wireMock.verify(getRequestedFor(urlEqualTo("/person/libra/12345")))
@@ -97,7 +97,7 @@ class CprServiceClientTest {
     )
 
     assertThrows(WebClientResponseException.ServiceUnavailable::class.java) {
-      client.getCprCanonicalRecordByCommonPlatformId("defendant-123").block()
+      client.getCommonPlatformPerson("defendant-123").block()
     }
 
     wireMock.verify(4, getRequestedFor(urlEqualTo("/person/commonplatform/defendant-123")))
@@ -111,7 +111,7 @@ class CprServiceClientTest {
     )
 
     assertThrows(WebClientResponseException.BadRequest::class.java) {
-      client.getCprCanonicalRecordByCommonPlatformId("defendant-123").block()
+      client.getCommonPlatformPerson("defendant-123").block()
     }
 
     wireMock.verify(1, getRequestedFor(urlEqualTo("/person/commonplatform/defendant-123")))
@@ -126,7 +126,7 @@ class CprServiceClientTest {
     )
 
     val exception = assertThrows(RuntimeException::class.java) {
-      client.getCprCanonicalRecordByCommonPlatformId("defendant-123").block()
+      client.getCommonPlatformPerson("defendant-123").block()
     }
 
     assertTrue(exception.cause is TimeoutException)

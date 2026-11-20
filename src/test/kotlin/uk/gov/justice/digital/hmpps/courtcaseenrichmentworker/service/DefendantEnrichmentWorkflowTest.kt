@@ -93,7 +93,7 @@ class DefendantEnrichmentWorkflowTest {
     val timeout = Duration.ofSeconds(10)
     val enrichment = DefendantEnrichmentService(
       CprServiceClient(webClient, true, timeout),
-      OffenderSearchRestClient(webClient, "/match", "/search", true, timeout),
+      OffenderSearchRestClient(webClient, true, timeout),
     )
     val job = DefendantEnrichmentJobService(
       EnrichmentTargetService(CourtCaseServiceClient(webClient, timeout)),

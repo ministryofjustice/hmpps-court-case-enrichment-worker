@@ -192,7 +192,7 @@ class OffenderSearchRestClientTest {
     stubResponse("/search", "[]")
     client.search("X12345").block()
     server.resetRequests()
-    client = OffenderSearchRestClient(webClient, "/match", "/search", false, Duration.ofMillis(300))
+    client = OffenderSearchRestClient(webClient, false, Duration.ofMillis(300))
     listOf("/match", "/search").forEach { path ->
       server.stubFor(post(urlEqualTo(path)).willReturn(aResponse().withStatus(200).withFixedDelay(1000)))
       val error = assertThrows(RuntimeException::class.java) { call(path) }
@@ -214,7 +214,7 @@ class OffenderSearchRestClientTest {
       repository,
       InMemoryOAuth2AuthorizedClientService(repository),
     ).offenderSearchWebClient(WebClient.builder())
-    client = OffenderSearchRestClient(webClient, "/match", "/search", disableAuthentication, Duration.ofSeconds(10))
+    client = OffenderSearchRestClient(webClient, disableAuthentication, Duration.ofSeconds(10))
   }
 
   private fun call(path: String) {
