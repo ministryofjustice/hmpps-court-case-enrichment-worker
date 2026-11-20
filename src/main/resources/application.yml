@@ -95,7 +95,5 @@ court-case-service:
 
 offender-search:
   base-url: ${OFFENDER_SEARCH_BASE_URL}
-  post-match-url: /match
-  post-search-url: /search
   disable-authentication: ${OFFENDER_SEARCH_DISABLE_AUTHENTICATION:false}
   timeout: 10s
