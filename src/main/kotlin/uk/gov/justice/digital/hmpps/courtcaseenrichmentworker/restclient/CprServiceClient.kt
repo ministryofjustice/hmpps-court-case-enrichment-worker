@@ -20,14 +20,14 @@ class CprServiceClient(
 
   override fun getLibraPerson(cId: String): Mono<CprDefendant> = getCprCanonicalRecordByLibraId(cId)
 
-  fun getCprCanonicalRecordByCommonPlatformId(
+  private fun getCprCanonicalRecordByCommonPlatformId(
     defendantId: String,
   ): Mono<CprDefendant> = getCprRecord(
     "/person/commonplatform/{id}",
     defendantId,
   )
 
-  fun getCprCanonicalRecordByLibraId(
+  private fun getCprCanonicalRecordByLibraId(
     cId: String,
   ): Mono<CprDefendant> = getCprRecord(
     "/person/libra/{id}",
