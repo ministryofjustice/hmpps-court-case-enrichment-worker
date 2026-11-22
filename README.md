@@ -224,10 +224,11 @@ counts successful responses containing zero results. A connector with zero calls
 was not exercised. Retries are not counted as additional logical calls.
 Enable `logging.level.ServiceClientLogging=DEBUG` temporarily for per-call detail.
 
-For the POC, Helm `namespace_secrets` maps `OFFENDER_SEARCH_CLIENT_ID` and
-`OFFENDER_SEARCH_CLIENT_SECRET` to `nomis-oauth-client-id` and
-`nomis-oauth-client-secret` in `court-case-service-secrets`. That secret must
-exist in the worker's namespace in each deployed environment.
+Helm `namespace_secrets` maps the Offender Search, Court Case Service, and
+Person Record Search client ID and secret variables to the
+`nomis-oauth-client-id` and `nomis-oauth-client-secret` keys in
+`hmpps-court-case-enrichment-worker-secrets`. That secret must exist in the
+worker's namespace in each deployed environment.
 The registration name `offender-search-client` is an internal alias; it does
 not need to match the registration name used by Court Case Service.
 The worker requests service-only client-credentials tokens from
@@ -249,9 +250,8 @@ Requests use a service token obtained from HMPPS Auth with the
 `court-case-service-client` OAuth registration, not the caller's bearer token.
 Before deploying, provision this worker's own credentials and map them to
 `COURT_CASE_SERVICE_CLIENT_ID` and `COURT_CASE_SERVICE_CLIENT_SECRET` through
-Helm `namespace_secrets`. Do not reuse Court Case Matcher's credentials.
-The worker's secret resource/key names have not yet been supplied, so that mapping
-is not included. Preprod and prod require these variables at startup.
+Helm `namespace_secrets` from `hmpps-court-case-enrichment-worker-secrets`.
+Preprod and prod require these variables at startup.
 The local `dev` profile has placeholder credentials that must be overridden
 to call the deployed service.
 
