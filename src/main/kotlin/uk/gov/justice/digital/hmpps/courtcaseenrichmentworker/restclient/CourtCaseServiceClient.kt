@@ -76,15 +76,13 @@ class CourtCaseServiceClient(
     fromDate: LocalDate,
     toDate: LocalDate,
     courtCode: String,
-  ): Mono<DefendantIdsResponse> =
-    getTargets("/enrichment-targets/defendant-ids", fromDate, toDate, courtCode, DefendantIdsResponse::class.java)
+  ): Mono<DefendantIdsResponse> = getTargets("/enrichment-targets/defendant-ids", fromDate, toDate, courtCode, DefendantIdsResponse::class.java)
 
   fun getCids(
     fromDate: LocalDate,
     toDate: LocalDate,
     courtCode: String,
-  ): Mono<CidsResponse> =
-    getTargets("/enrichment-targets/cids", fromDate, toDate, courtCode, CidsResponse::class.java)
+  ): Mono<CidsResponse> = getTargets("/enrichment-targets/cids", fromDate, toDate, courtCode, CidsResponse::class.java)
 
   private fun <T : Any> getTargets(
     path: String,
@@ -98,10 +96,10 @@ class CourtCaseServiceClient(
 
     webClient.get()
       .uri { builder ->
-        builder        .path(path)
-        .queryParam("fromDate", fromDate)
-        .queryParam("toDate", toDate)
-        .queryParam("courtCode", courtCode)
+        builder.path(path)
+          .queryParam("fromDate", fromDate)
+          .queryParam("toDate", toDate)
+          .queryParam("courtCode", courtCode)
         builder.build()
       }
       .accept(MediaType.APPLICATION_JSON)

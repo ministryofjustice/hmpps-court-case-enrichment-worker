@@ -1,7 +1,7 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.resource
 
-import io.swagger.v3.oas.annotations.security.SecurityRequirements
 import io.swagger.v3.oas.annotations.Hidden
+import io.swagger.v3.oas.annotations.security.SecurityRequirements
 import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.PostMapping
