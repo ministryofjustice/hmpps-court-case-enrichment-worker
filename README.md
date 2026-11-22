@@ -125,20 +125,24 @@ Any caller able to reach this endpoint can trigger the job, including via the
 existing ingress allowlist. Restrict access using ingress rules and Kubernetes
 NetworkPolicies if the endpoint must be limited to internal callers.
 
-The job accepts no court-code parameter and currently fetches targets only for
-court `B03DE`, hard-coded for the POC in `DefendantEnrichmentJobService`.
+The job accepts no court-code parameter. Its court codes are configured in
+`defendant-enrichment.court-codes` in `src/main/resources/application.yml`.
 Common Platform and Libra enrichment are enabled.
 
-The workflow currently fetches all pages of Common Platform defendant IDs
-and Libra cIDs from CCS for 14 days starting today: `fromDate` is today
+The workflow fetches all Common Platform defendant IDs and Libra cIDs from CCS
+in one request per source and court for 14 days starting today: `fromDate` is today
 (inclusive) and `toDate` is today plus 14 days (exclusive).
-`EnrichmentTargetService` owns these CCS target calls and pagination validation.
+`EnrichmentTargetService` owns these CCS target calls.
 Successful invocations return HTTP 200 with status
-`ENRICHMENT_COMPLETED`, fetched and processed counts for both sources, court
-code `B03DE`, and a `results` array containing Common Platform and Libra enrichment
-results. `persistedResults` counts results acknowledged by CCS; failed counts are zero
-on successful runs. Each target is enriched and then posted to CCS before the next
-target is processed, including `NO_MATCH` and `NEEDS_REVIEW` outcomes.
+`ENRICHMENT_COMPLETED`, fetched and processed counts for both sources, a
+`courtCodes` list containing all configured courts processed, and a `results`
+array containing Common Platform and Libra enrichment results.
+`persistedResults` counts results acknowledged by CCS; failed counts are zero
+on successful runs. Courts are processed in configuration order. For each court,
+the worker fetches both target lists, then enriches and posts each target to CCS
+before moving to the next court, including `NO_MATCH` and `NEEDS_REVIEW` outcomes.
+The job returns its result only after all configured courts have been processed
+successfully.
 CCS target-fetch, enrichment, and persistence failures fail the job with a non-2xx response.
 
 The enrichment implementation processes Common Platform and then Libra targets synchronously
@@ -237,11 +241,9 @@ For local mocking, override it and set `OFFENDER_SEARCH_DISABLE_AUTHENTICATION=t
 
 ### Court Case Service client
 
-`CourtCaseServiceClient.getDefendantIds` and `getCids` fetch a single page from
+`CourtCaseServiceClient.getDefendantIds` and `getCids` fetch all targets from
 `/enrichment-targets/defendant-ids` and `/enrichment-targets/cids` respectively.
-Both accept an inclusive `fromDate`, exclusive `toDate`, optional `courtCode`,
-zero-based `page` (default 0), and `size` (default 200, valid range 1-500).
-The response includes pagination metadata; callers use `hasNext` to request subsequent pages.
+Both require an inclusive `fromDate`, exclusive `toDate`, and a single `courtCode`.
 
 Requests use a service token obtained from HMPPS Auth with the
 `court-case-service-client` OAuth registration, not the caller's bearer token.

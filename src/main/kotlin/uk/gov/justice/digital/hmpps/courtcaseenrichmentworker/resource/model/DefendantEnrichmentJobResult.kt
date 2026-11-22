@@ -8,7 +8,7 @@ data class DefendantEnrichmentJobResult(
   val status: String,
   val fromDate: LocalDate,
   val toDate: LocalDate,
-  val courtCode: String?,
+  val courtCodes: List<String>,
   val defendantIdsFetched: Long,
   val cidsFetched: Long,
   val defendantIdsProcessed: Long,

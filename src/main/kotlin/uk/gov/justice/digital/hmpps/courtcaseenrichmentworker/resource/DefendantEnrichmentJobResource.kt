@@ -1,8 +1,7 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.resource
 
-import io.swagger.v3.oas.annotations.Operation
-import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.security.SecurityRequirements
+import io.swagger.v3.oas.annotations.Hidden
 import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.PostMapping
@@ -11,20 +10,12 @@ import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.resource.model.Def
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.service.DefendantEnrichmentJobService
 
 @RestController
+@Hidden
 class DefendantEnrichmentJobResource(
   private val defendantEnrichmentJobService: DefendantEnrichmentJobService,
 ) {
   @PostMapping("/jobs/enrich-defendants", produces = [MediaType.APPLICATION_JSON_VALUE])
   @PreAuthorize("permitAll()")
   @SecurityRequirements
-  @Operation(
-    summary = "Trigger defendant enrichment from a Kubernetes CronJob",
-    description = "Fetches Common Platform defendant IDs and Libra cIDs from CCS, " +
-      "for court B03DE for the POC; no court-code parameter is accepted. " +
-      "No authentication is required; access must be restricted by network controls. " +
-      "Common Platform and Libra targets are enriched synchronously using separate CPR lookups and Offender Search. " +
-      "Each clean enrichment result is posted individually to CCS for persistence.",
-  )
-  @ApiResponse(responseCode = "200", description = "Defendant enrichment completed and acknowledged by CCS")
   fun enrichDefendants(): DefendantEnrichmentJobResult = defendantEnrichmentJobService.enrichDefendants()
 }

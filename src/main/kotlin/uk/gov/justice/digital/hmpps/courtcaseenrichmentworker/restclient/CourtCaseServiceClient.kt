@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
 import reactor.core.publisher.Mono
-import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase.CidsPage
-import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase.DefendantIdsPage
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase.CidsResponse
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase.DefendantIdsResponse
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase.PersistEnrichmentResultRequest
 import java.time.Duration
 import java.time.LocalDate
@@ -75,41 +75,33 @@ class CourtCaseServiceClient(
   fun getDefendantIds(
     fromDate: LocalDate,
     toDate: LocalDate,
-    courtCode: String? = null,
-    page: Int = 0,
-    size: Int = 200,
-  ): Mono<DefendantIdsPage> = getTargets("/enrichment-targets/defendant-ids", fromDate, toDate, courtCode, page, size, DefendantIdsPage::class.java)
+    courtCode: String,
+  ): Mono<DefendantIdsResponse> =
+    getTargets("/enrichment-targets/defendant-ids", fromDate, toDate, courtCode, DefendantIdsResponse::class.java)
 
   fun getCids(
     fromDate: LocalDate,
     toDate: LocalDate,
-    courtCode: String? = null,
-    page: Int = 0,
-    size: Int = 200,
-  ): Mono<CidsPage> = getTargets("/enrichment-targets/cids", fromDate, toDate, courtCode, page, size, CidsPage::class.java)
+    courtCode: String,
+  ): Mono<CidsResponse> =
+    getTargets("/enrichment-targets/cids", fromDate, toDate, courtCode, CidsResponse::class.java)
 
   private fun <T : Any> getTargets(
     path: String,
     fromDate: LocalDate,
     toDate: LocalDate,
-    courtCode: String?,
-    page: Int,
-    size: Int,
+    courtCode: String,
     responseType: Class<T>,
   ): Mono<T> = Mono.defer {
     require(fromDate.isBefore(toDate)) { "fromDate must be before the exclusive toDate" }
-    require(page >= 0) { "page must be zero-based and non-negative" }
-    require(size in 1..500) { "size must be between 1 and 500" }
-    require(courtCode == null || courtCode.isNotBlank()) { "courtCode must not be blank when supplied" }
+    require(courtCode.isNotBlank() && ',' !in courtCode) { "A single non-blank courtCode is required" }
 
     webClient.get()
       .uri { builder ->
-        builder.path(path)
-          .queryParam("fromDate", fromDate)
-          .queryParam("toDate", toDate)
-          .queryParam("page", page)
-          .queryParam("size", size)
-        if (courtCode != null) builder.queryParam("courtCode", courtCode)
+        builder        .path(path)
+        .queryParam("fromDate", fromDate)
+        .queryParam("toDate", toDate)
+        .queryParam("courtCode", courtCode)
         builder.build()
       }
       .accept(MediaType.APPLICATION_JSON)

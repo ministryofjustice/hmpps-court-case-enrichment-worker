@@ -91,51 +91,46 @@ class CourtCaseServiceClientTest {
   fun `gets defendant IDs with court filter and service token`() {
     stubResponse(
       "/enrichment-targets/defendant-ids",
-      """{"defendantIds":["defendant-id"],"page":0,"size":200,"totalElements":340,"totalPages":2,"hasNext":true}""",
+      """{"defendantIds":["defendant-id"]}""",
     )
 
     val result = client.getDefendantIds(fromDate, toDate, courtCode = "B10JQ").block()!!
 
     assertEquals(listOf("defendant-id"), result.defendantIds)
-    assertEquals(340L, result.totalElements)
-    assertEquals(2, result.totalPages)
-    assertTrue(result.hasNext)
     server.verify(
       getRequestedFor(urlPathEqualTo("/enrichment-targets/defendant-ids"))
         .withQueryParam("fromDate", equalTo("2026-10-09"))
         .withQueryParam("toDate", equalTo("2026-10-23"))
         .withQueryParam("courtCode", equalTo("B10JQ"))
-        .withQueryParam("page", equalTo("0"))
-        .withQueryParam("size", equalTo("200"))
         .withHeader("Authorization", equalTo("Bearer service-token")),
     )
     server.verify(postRequestedFor(urlEqualTo("/oauth/token")).withRequestBody(equalTo("grant_type=client_credentials")))
   }
 
   @Test
-  fun `gets CIDs without court filter and supports maximum page size`() {
+  fun `gets all CIDs for one court in a single request`() {
     stubResponse(
       "/enrichment-targets/cids",
-      """{"cIds":["c12345"],"page":1,"size":500,"totalElements":501,"totalPages":2,"hasNext":false}""",
+      """{"cIds":["c12345"]}""",
     )
 
-    val result = client.getCids(fromDate, toDate, page = 1, size = 500).block()!!
+    val result = client.getCids(fromDate, toDate, courtCode = "B10JQ").block()!!
 
     assertEquals(listOf("c12345"), result.cIds)
-    assertEquals(1, result.page)
-    assertEquals(false, result.hasNext)
-    assertTrue(server.allServeEvents.filter { it.request.method.value() == "GET" }.all { !it.request.queryParams.containsKey("courtCode") })
-    server.verify(getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")).withQueryParam("size", equalTo("500")))
+    server.verify(
+      getRequestedFor(urlPathEqualTo("/enrichment-targets/cids"))
+        .withQueryParam("courtCode", equalTo("B10JQ")),
+    )
+    val targetRequest = server.allServeEvents.single { it.request.url.startsWith("/enrichment-targets/cids") }.request
+    assertTrue(targetRequest.queryParams.keys.none { it in setOf("page", "size") })
   }
 
   @Test
   fun `rejects invalid query parameters without sending requests`() {
-    assertThrows(IllegalArgumentException::class.java) { client.getCids(fromDate, fromDate).block() }
-    assertThrows(IllegalArgumentException::class.java) { client.getCids(toDate, fromDate).block() }
-    assertThrows(IllegalArgumentException::class.java) { client.getCids(fromDate, toDate, page = -1).block() }
-    assertThrows(IllegalArgumentException::class.java) { client.getCids(fromDate, toDate, size = 501).block() }
-    assertThrows(IllegalArgumentException::class.java) { client.getCids(fromDate, toDate, size = 0).block() }
-    assertThrows(IllegalArgumentException::class.java) { client.getCids(fromDate, toDate, courtCode = " ").block() }
+    assertThrows(IllegalArgumentException::class.java) { client.getCids(fromDate, fromDate, "B10JQ").block() }
+    assertThrows(IllegalArgumentException::class.java) { client.getCids(toDate, fromDate, "B10JQ").block() }
+    assertThrows(IllegalArgumentException::class.java) { client.getCids(fromDate, toDate, " ").block() }
+    assertThrows(IllegalArgumentException::class.java) { client.getCids(fromDate, toDate, "B10JQ,B03DE").block() }
     assertTrue(server.allServeEvents.isEmpty())
   }
 
@@ -143,7 +138,7 @@ class CourtCaseServiceClientTest {
   fun `retries server failure only three times`() {
     server.stubFor(get(urlPathEqualTo("/enrichment-targets/cids")).willReturn(aResponse().withStatus(503)))
 
-    assertThrows(WebClientResponseException.ServiceUnavailable::class.java) { client.getCids(fromDate, toDate).block() }
+    assertThrows(WebClientResponseException.ServiceUnavailable::class.java) { client.getCids(fromDate, toDate, "B10JQ").block() }
 
     server.verify(4, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
   }
@@ -152,31 +147,30 @@ class CourtCaseServiceClientTest {
   fun `does not hide or retry a missing endpoint`() {
     server.stubFor(get(urlPathEqualTo("/enrichment-targets/cids")).willReturn(aResponse().withStatus(404)))
 
-    assertThrows(WebClientResponseException.NotFound::class.java) { client.getCids(fromDate, toDate).block() }
+    assertThrows(WebClientResponseException.NotFound::class.java) { client.getCids(fromDate, toDate, "B10JQ").block() }
 
     server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
   }
 
   @Test
-  fun `does not treat an empty response as an empty page`() {
+  fun `does not treat an empty response as an empty target list`() {
     server.stubFor(get(urlPathEqualTo("/enrichment-targets/cids")).willReturn(aResponse().withStatus(200)))
 
-    assertThrows(IllegalStateException::class.java) { client.getCids(fromDate, toDate).block() }
+    assertThrows(IllegalStateException::class.java) { client.getCids(fromDate, toDate, "B10JQ").block() }
 
     server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
   }
 
   @Test
-  fun `returns an empty page when the service has no targets`() {
+  fun `returns an empty target list when the service has no targets`() {
     stubResponse(
       "/enrichment-targets/cids",
-      """{"cIds":[],"page":0,"size":200,"totalElements":0,"totalPages":0,"hasNext":false}""",
+      """{"cIds":[]}""",
     )
 
-    val result = client.getCids(fromDate, toDate).block()!!
+    val result = client.getCids(fromDate, toDate, "B10JQ").block()!!
 
     assertTrue(result.cIds.isEmpty())
-    assertEquals(false, result.hasNext)
     server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
   }
 
@@ -184,7 +178,7 @@ class CourtCaseServiceClientTest {
   fun `does not retry malformed response data`() {
     stubResponse("/enrichment-targets/cids", """{"cIds":""")
 
-    assertThrows(DecodingException::class.java) { client.getCids(fromDate, toDate).block() }
+    assertThrows(DecodingException::class.java) { client.getCids(fromDate, toDate, "B10JQ").block() }
 
     server.verify(1, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
   }
@@ -197,7 +191,7 @@ class CourtCaseServiceClientTest {
         .willReturn(aResponse().withFixedDelay(1000).withStatus(200)),
     )
 
-    val error = assertThrows(RuntimeException::class.java) { client.getCids(fromDate, toDate).block() }
+    val error = assertThrows(RuntimeException::class.java) { client.getCids(fromDate, toDate, "B10JQ").block() }
 
     assertTrue(error.cause is TimeoutException)
     server.verify(4, getRequestedFor(urlPathEqualTo("/enrichment-targets/cids")))
@@ -464,9 +458,9 @@ class CourtCaseServiceClientTest {
 
   @Test
   fun `times out writes without retrying a potentially completed update`() {
-    stubResponse("/enrichment-targets/cids", """{"cIds":[],"page":0,"size":200,"totalElements":0,"totalPages":0,"hasNext":false}""")
+    stubResponse("/enrichment-targets/cids", """{"cIds":[]}""")
     createClient(persistenceTimeout = Duration.ofMillis(500))
-    client.getCids(fromDate, toDate).block()
+    client.getCids(fromDate, toDate, "B10JQ").block()
     server.resetRequests()
     server.stubFor(
       post(urlEqualTo("/enrichment-results"))
