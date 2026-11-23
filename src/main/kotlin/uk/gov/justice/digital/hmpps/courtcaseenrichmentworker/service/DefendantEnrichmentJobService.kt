@@ -68,19 +68,20 @@ class DefendantEnrichmentJobService(
 
   private fun enrichDefendants(runId: String, fromDate: LocalDate, toDate: LocalDate, courtCode: String): CourtEnrichmentResult {
     log.info(
-      "Starting defendant enrichment target fetch runId={} fromDate={} toDate={} courtCode={}",
+      "Starting defendant enrichment target fetch runId={} courtCode={} fromDate={} toDate={}",
       runId,
+      courtCode,
       fromDate,
       toDate,
-      courtCode,
     )
 
     val defendantIds = enrichmentTargetService.fetchDefendantIds(runId, fromDate, toDate, courtCode)
     val cids = enrichmentTargetService.fetchCids(runId, fromDate, toDate, courtCode)
 
     log.info(
-      "Completed defendant enrichment target fetch runId={} defendantIdsFetched={} cidsFetched={}",
+      "Completed defendant enrichment target fetch runId={} courtCode={} defendantIdsFetched={} cidsFetched={}",
       runId,
+      courtCode,
       defendantIds.size,
       cids.size,
     )
