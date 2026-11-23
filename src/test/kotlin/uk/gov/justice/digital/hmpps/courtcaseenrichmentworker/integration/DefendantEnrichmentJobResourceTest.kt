@@ -19,7 +19,7 @@ class DefendantEnrichmentJobResourceTest : IntegrationTestBase() {
 
   @Test
   fun `binds configured court codes`() {
-    assertEquals(listOf("B03DE"), defendantEnrichmentProperties.courtCodes)
+    assertEquals(listOf("B03DE", "B06IS", "B20BL", "B47CL"), defendantEnrichmentProperties.courtCodes)
   }
 
   @Test

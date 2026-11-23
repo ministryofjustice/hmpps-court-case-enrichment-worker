@@ -101,3 +101,6 @@ offender-search:
 defendant-enrichment:
   court-codes:
     - B03DE
+    - B06IS
+    - B20BL
+    - B47CL
