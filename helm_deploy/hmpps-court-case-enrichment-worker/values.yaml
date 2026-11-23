@@ -37,12 +37,11 @@ generic-service:
   namespace_secrets:
     hmpps-court-case-enrichment-worker-application-insights:
       APPLICATIONINSIGHTS_CONNECTION_STRING: "APPLICATIONINSIGHTS_CONNECTION_STRING"
-    court-case-matcher-secrets:
+    hmpps-court-case-enrichment-worker-secrets:
       PERSON_RECORD_SEARCH_CLIENT_ID: "nomis-oauth-client-id"
       PERSON_RECORD_SEARCH_CLIENT_SECRET: "nomis-oauth-client-secret"
       COURT_CASE_SERVICE_CLIENT_ID: "nomis-oauth-client-id"
       COURT_CASE_SERVICE_CLIENT_SECRET: "nomis-oauth-client-secret"
-    court-case-service-secrets:
       OFFENDER_SEARCH_CLIENT_ID: "nomis-oauth-client-id"
       OFFENDER_SEARCH_CLIENT_SECRET: "nomis-oauth-client-secret"
 

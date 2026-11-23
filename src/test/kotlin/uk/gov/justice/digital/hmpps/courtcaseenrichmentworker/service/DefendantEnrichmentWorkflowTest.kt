@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.springframework.web.reactive.function.client.WebClient
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.config.DefendantEnrichmentProperties
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CourtCaseServiceClient
@@ -58,14 +59,14 @@ class DefendantEnrichmentWorkflowTest {
       get(urlPathEqualTo("/enrichment-targets/defendant-ids"))
         .willReturn(
           aResponse().withHeader("Content-Type", "application/json")
-            .withBody("""{"defendantIds":["cp-123"],"page":0,"size":200,"totalElements":1,"totalPages":1,"hasNext":false}"""),
+            .withBody("""{"defendantIds":["cp-123"]}"""),
         ),
     )
     server.stubFor(
       get(urlPathEqualTo("/enrichment-targets/cids"))
         .willReturn(
           aResponse().withHeader("Content-Type", "application/json")
-            .withBody("""{"cIds":["libra-123"],"page":0,"size":200,"totalElements":1,"totalPages":1,"hasNext":false}"""),
+            .withBody("""{"cIds":["libra-123"]}"""),
         ),
     )
     server.stubFor(
@@ -100,6 +101,7 @@ class DefendantEnrichmentWorkflowTest {
       Clock.fixed(Instant.parse("2026-10-14T04:00:00Z"), ZoneOffset.UTC),
       enrichment,
       CourtCaseServiceClient(webClient, timeout),
+      DefendantEnrichmentProperties().apply { courtCodes = listOf("B03DE") },
     )
 
     val result = job.enrichDefendants()
@@ -110,7 +112,7 @@ class DefendantEnrichmentWorkflowTest {
     assertThat(summaries[1]).contains("runId=${result.runId}", "connector=OFFENDER_SEARCH", "calls=1 completed=1 emptyResults=0 failures=0")
 
     assertEquals("ENRICHMENT_COMPLETED", result.status)
-    assertEquals("B03DE", result.courtCode)
+    assertEquals(listOf("B03DE"), result.courtCodes)
     assertEquals(1L, result.defendantIdsFetched)
     assertEquals(1L, result.cidsFetched)
     assertEquals(1L, result.defendantIdsProcessed)

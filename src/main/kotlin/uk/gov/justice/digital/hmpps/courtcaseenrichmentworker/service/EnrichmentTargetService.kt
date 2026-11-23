@@ -9,112 +9,33 @@ import java.time.LocalDate
 class EnrichmentTargetService(
   private val courtCaseServiceClient: CourtCaseServiceClient,
 ) {
-  fun fetchAllDefendantIds(
+  fun fetchDefendantIds(
     runId: String,
     fromDate: LocalDate,
     toDate: LocalDate,
-    courtCode: String?,
-  ): List<String> = fetchAllPages(
-    source = "COMMON_PLATFORM",
-    runId = runId,
-  ) { page ->
-    val response = courtCaseServiceClient
-      .getDefendantIds(
-        fromDate = fromDate,
-        toDate = toDate,
-        courtCode = courtCode,
-        page = page,
-        size = PAGE_SIZE,
-      )
-      .block() ?: error("Court Case Service returned null defendant IDs page")
+    courtCode: String,
+  ): List<String> = courtCaseServiceClient
+    .getDefendantIds(fromDate, toDate, courtCode)
+    .block()?.defendantIds
+    ?.also { logFetchedTargets(runId, "COMMON_PLATFORM", it.size) }
+    ?: error("Court Case Service returned null defendant IDs")
 
-    PageResult(
-      page = response.page,
-      targets = response.defendantIds,
-      hasNext = response.hasNext,
-      totalElements = response.totalElements,
-    )
-  }
-
-  fun fetchAllCids(
+  fun fetchCids(
     runId: String,
     fromDate: LocalDate,
     toDate: LocalDate,
-    courtCode: String?,
-  ): List<String> = fetchAllPages(
-    source = "LIBRA",
-    runId = runId,
-  ) { page ->
-    val response = courtCaseServiceClient
-      .getCids(
-        fromDate = fromDate,
-        toDate = toDate,
-        courtCode = courtCode,
-        page = page,
-        size = PAGE_SIZE,
-      )
-      .block() ?: error("Court Case Service returned null cIds page")
+    courtCode: String,
+  ): List<String> = courtCaseServiceClient
+    .getCids(fromDate, toDate, courtCode)
+    .block()?.cIds
+    ?.also { logFetchedTargets(runId, "LIBRA", it.size) }
+    ?: error("Court Case Service returned null cIDs")
 
-    PageResult(
-      page = response.page,
-      targets = response.cIds,
-      hasNext = response.hasNext,
-      totalElements = response.totalElements,
-    )
+  private fun logFetchedTargets(runId: String, source: String, itemCount: Int) {
+    log.info("Fetched enrichment targets runId={} source={} itemCount={}", runId, source, itemCount)
   }
-
-  private fun fetchAllPages(
-    source: String,
-    runId: String,
-    fetchPage: (page: Int) -> PageResult,
-  ): List<String> {
-    var page = 0
-    val targets = mutableListOf<String>()
-
-    while (true) {
-      check(page < MAX_PAGES) {
-        "Exceeded $MAX_PAGES pages while fetching $source targets for runId=$runId"
-      }
-
-      val result = fetchPage(page)
-
-      check(result.page == page) {
-        "Expected page $page but got ${result.page} while fetching $source targets for runId=$runId"
-      }
-
-      check(result.targets.isNotEmpty() || !result.hasNext) {
-        "Empty non-final page while fetching $source targets for runId=$runId"
-      }
-      targets.addAll(result.targets)
-
-      log.info(
-        "Fetched page of enrichment targets runId={} source={} page={} itemCount={} totalElements={} hasNext={}",
-        runId,
-        source,
-        result.page,
-        result.targets.size,
-        result.totalElements,
-        result.hasNext,
-      )
-
-      if (!result.hasNext) {
-        return targets
-      }
-
-      page++
-    }
-  }
-
-  private data class PageResult(
-    val page: Int,
-    val targets: List<String>,
-    val hasNext: Boolean,
-    val totalElements: Long,
-  )
 
   companion object {
     private val log = LoggerFactory.getLogger(EnrichmentTargetService::class.java)
-    private const val PAGE_SIZE = 200
-    private const val MAX_PAGES = 1_000
   }
 }
