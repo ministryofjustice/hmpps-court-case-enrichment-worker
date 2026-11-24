@@ -14,6 +14,7 @@ services:
       - PERSON_RECORD_SERVICE_BASE_URL=http://host.docker.internal:8091
       - CPR_SERVICE_DISABLE_AUTHENTICATION=true
       - SPRING_PROFILES_ACTIVE=dev
+      - DEFENDANT_ENRICHMENT_COURT_CODES=B03DE,B06IS,B20BL,B47CL
 
   hmpps-auth:
     image: ghcr.io/ministryofjustice/hmpps-auth:latest

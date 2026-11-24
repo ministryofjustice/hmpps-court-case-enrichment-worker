@@ -125,9 +125,11 @@ Any caller able to reach this endpoint can trigger the job, including via the
 existing ingress allowlist. Restrict access using ingress rules and Kubernetes
 NetworkPolicies if the endpoint must be limited to internal callers.
 
-The job accepts no court-code parameter. Its court codes are configured in
-`defendant-enrichment.court-codes` in `src/main/resources/application.yml`.
-Common Platform and Libra enrichment are enabled.
+The job accepts no court-code parameter. Configure the comma-separated
+`DEFENDANT_ENRICHMENT_COURT_CODES` environment variable separately in each
+`helm_deploy/values-<environment>.yaml` file. The job fails when invoked if the
+list is missing or contains a blank court code. Common Platform and Libra
+enrichment are enabled.
 
 The workflow fetches all Common Platform defendant IDs and Libra cIDs from CCS
 in one request per source and court for 14 days starting today: `fromDate` is today
@@ -310,7 +312,8 @@ docker compose pull && docker compose up --scale hmpps-court-case-enrichment-wor
 ```
 
 will just start a docker instance of HMPPS Auth. The application should then be started with a `dev` active profile
-in Intellij.
+in Intellij. Set `DEFENDANT_ENRICHMENT_COURT_CODES` in the run configuration
+to a comma-separated list such as `B03DE,B06IS,B20BL,B47CL` to run the job.
 
 ### Building and running the docker image locally
 

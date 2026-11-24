@@ -97,10 +97,3 @@ offender-search:
   base-url: ${OFFENDER_SEARCH_BASE_URL}
   disable-authentication: ${OFFENDER_SEARCH_DISABLE_AUTHENTICATION:false}
   timeout: 10s
-
-defendant-enrichment:
-  court-codes:
-    - B03DE
-    - B06IS
-    - B20BL
-    - B47CL
