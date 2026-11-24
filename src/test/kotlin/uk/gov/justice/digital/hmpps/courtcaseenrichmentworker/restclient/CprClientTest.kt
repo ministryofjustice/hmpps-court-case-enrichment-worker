@@ -18,9 +18,9 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import java.time.Duration
 import java.util.concurrent.TimeoutException
 
-class CprServiceClientTest {
+class CprClientTest {
   private val wireMock = WireMockServer(wireMockConfig().dynamicPort())
-  private lateinit var client: CprServiceClient
+  private lateinit var client: CprClient
 
   @BeforeEach
   fun startServer() {
@@ -135,7 +135,7 @@ class CprServiceClientTest {
 
   private fun createClient(timeout: Duration = Duration.ofSeconds(10)) {
     client =
-      CprServiceClient(
+      CprClient(
         WebClient.builder().baseUrl("http://localhost:${wireMock.port()}").build(),
         true,
         timeout,

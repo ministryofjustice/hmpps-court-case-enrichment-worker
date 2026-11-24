@@ -12,7 +12,7 @@ import reactor.core.publisher.Mono
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CourtCaseServiceClient
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CprClient
-import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchRestClient
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchClient
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprDefendant
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprIdentifier
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.offendersearch.OtherIds
@@ -26,7 +26,7 @@ class DefendantEnrichmentResourceTest : IntegrationTestBase() {
   private lateinit var cpr: CprClient
 
   @MockitoBean
-  private lateinit var search: OffenderSearchRestClient
+  private lateinit var search: OffenderSearchClient
 
   @MockitoBean
   private lateinit var courtCaseService: CourtCaseServiceClient

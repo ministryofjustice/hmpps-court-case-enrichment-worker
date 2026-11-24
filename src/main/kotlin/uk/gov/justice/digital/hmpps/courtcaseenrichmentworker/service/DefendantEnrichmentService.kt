@@ -15,14 +15,14 @@ import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentRe
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CprClient
-import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchRestClient
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchClient
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprDefendant
 import java.time.LocalDate
 
 @Service
 class DefendantEnrichmentService(
   private val cprClient: CprClient,
-  private val offenderSearchClient: OffenderSearchRestClient,
+  private val offenderSearchClient: OffenderSearchClient,
 ) {
   fun enrichCommonPlatformDefendant(defendantId: String): EnrichmentResult {
     require(defendantId.isNotBlank()) { "defendantId must not be blank" }

@@ -193,7 +193,7 @@ is responding; use `/health` to check its dependencies.
 
 ### Offender Search client
 
-`OffenderSearchRestClient.match(MatchRequest)` posts JSON to `/match`.
+`OffenderSearchClient.match(MatchRequest)` posts JSON to `/match`.
 `search(crn)` posts a typed JSON request to `/search`, deserializes the response
 array, and returns a `SearchResponses` wrapper. API models do not include the
 other service's domain conversions or application-side match probability.

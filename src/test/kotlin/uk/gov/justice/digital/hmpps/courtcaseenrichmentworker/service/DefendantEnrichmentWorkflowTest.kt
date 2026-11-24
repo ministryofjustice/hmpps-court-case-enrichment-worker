@@ -26,8 +26,8 @@ import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.config.DefendantEn
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CourtCaseServiceClient
-import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CprServiceClient
-import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchRestClient
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CprClient
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchClient
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -93,8 +93,8 @@ class DefendantEnrichmentWorkflowTest {
     val webClient = WebClient.builder().baseUrl(server.baseUrl()).build()
     val timeout = Duration.ofSeconds(10)
     val enrichment = DefendantEnrichmentService(
-      CprServiceClient(webClient, true, timeout),
-      OffenderSearchRestClient(webClient, true, timeout),
+      CprClient(webClient, true, timeout),
+      OffenderSearchClient(webClient, true, timeout),
     )
     val job = DefendantEnrichmentJobService(
       EnrichmentTargetService(CourtCaseServiceClient(webClient, timeout)),
