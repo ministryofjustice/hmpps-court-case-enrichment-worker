@@ -9,6 +9,7 @@ generic-service:
 
   env:
     SPRING_PROFILES_ACTIVE: "prod"
+    DEFENDANT_ENRICHMENT_COURT_CODES: "C20WO"
     HMPPS_AUTH_URL: "https://sign-in.hmpps.service.justice.gov.uk/auth"
     PERSON_RECORD_SERVICE_BASE_URL: "https://hmpps-person-record.hmpps.service.justice.gov.uk"
     COURT_CASE_SERVICE_BASE_URL: "https://court-case-service.apps.live-1.cloud-platform.service.justice.gov.uk"

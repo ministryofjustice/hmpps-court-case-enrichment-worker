@@ -33,6 +33,9 @@ court-case-service:
 offender-search:
   base-url: "http://localhost:8093"
 
+defendant-enrichment:
+  court-codes: B03DE,B06IS,B20BL,B47CL
+
 springdoc:
   api-docs:
     enabled: true

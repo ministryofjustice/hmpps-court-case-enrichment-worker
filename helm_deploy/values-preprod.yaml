@@ -11,6 +11,7 @@ generic-service:
 
   env:
     SPRING_PROFILES_ACTIVE: "preprod"
+    DEFENDANT_ENRICHMENT_COURT_CODES: "B03DE,B06IS,B20BL,B47CL,C20WO"
     APPLICATIONINSIGHTS_CONFIGURATION_FILE: "applicationinsights.dev.json"
     HMPPS_AUTH_URL: "https://sign-in-preprod.hmpps.service.justice.gov.uk/auth"
     PERSON_RECORD_SERVICE_BASE_URL: "https://hmpps-person-record-preprod.hmpps.service.justice.gov.uk"
