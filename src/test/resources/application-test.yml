@@ -25,7 +25,6 @@ spring:
 
 person-record-service:
   base-url: "http://localhost:8091"
-  disable-authentication: true
 
 court-case-service:
   base-url: "http://localhost:8092"

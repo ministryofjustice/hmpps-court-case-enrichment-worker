@@ -14,7 +14,6 @@ import java.time.Duration
 @Component
 class CprClient(
   @param:Qualifier("personRecordServiceWebClient") private val webClient: WebClient,
-  @param:Value("\${person-record-service.disable-authentication:false}") private val disableAuthentication: Boolean,
   @param:Value("\${person-record-service.timeout:10s}") private val timeout: Duration,
 ) {
   fun getCommonPlatformPerson(defendantId: String): Mono<CprDefendant> = getCprRecord(
@@ -49,19 +48,9 @@ class CprClient(
     .timeout(timeout)
     .retryWhen(serviceClientRetry("CPR service"))
 
-  private fun get(path: String, identifier: String): WebClient.RequestHeadersSpec<*> {
-    val request =
-      webClient
-        .get()
-        .uri(path, identifier)
-        .accept(MediaType.APPLICATION_JSON)
-
-    return if (disableAuthentication) {
-      request
-    } else {
-      request.attributes(
-        ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId("person-record-search-client"),
-      )
-    }
-  }
+  private fun get(path: String, identifier: String): WebClient.RequestHeadersSpec<*> = webClient
+    .get()
+    .uri(path, identifier)
+    .accept(MediaType.APPLICATION_JSON)
+    .attributes(ServletOAuth2AuthorizedClientExchangeFilterFunction.clientRegistrationId("person-record-search-client"))
 }

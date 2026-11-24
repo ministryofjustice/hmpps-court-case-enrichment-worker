@@ -137,7 +137,6 @@ class CprClientTest {
     client =
       CprClient(
         WebClient.builder().baseUrl("http://localhost:${wireMock.port()}").build(),
-        true,
         timeout,
       )
   }
