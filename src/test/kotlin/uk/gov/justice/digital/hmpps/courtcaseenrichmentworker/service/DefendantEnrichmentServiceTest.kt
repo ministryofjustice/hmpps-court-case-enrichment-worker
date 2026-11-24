@@ -15,7 +15,7 @@ import reactor.core.publisher.Mono
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CprClient
-import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchRestClient
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchClient
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprAddress
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprAlias
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprDefendant
@@ -31,7 +31,7 @@ import java.time.format.DateTimeParseException
 
 class DefendantEnrichmentServiceTest {
   private val cpr = mock(CprClient::class.java)
-  private val search = mock(OffenderSearchRestClient::class.java)
+  private val search = mock(OffenderSearchClient::class.java)
   private val service = DefendantEnrichmentService(cpr, search)
 
   @Test

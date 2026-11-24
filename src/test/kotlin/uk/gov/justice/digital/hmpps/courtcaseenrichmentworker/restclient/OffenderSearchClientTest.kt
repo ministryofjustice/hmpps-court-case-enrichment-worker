@@ -33,9 +33,9 @@ import java.time.Duration
 import java.time.LocalDate
 import java.util.concurrent.TimeoutException
 
-class OffenderSearchRestClientTest {
+class OffenderSearchClientTest {
   private val server = WireMockServer(wireMockConfig().dynamicPort())
-  private lateinit var client: OffenderSearchRestClient
+  private lateinit var client: OffenderSearchClient
   private val request = MatchRequest(firstName = "Alex", surname = "Example", dateOfBirth = "1990-01-01")
 
   @BeforeEach
@@ -192,7 +192,7 @@ class OffenderSearchRestClientTest {
     stubResponse("/search", "[]")
     client.search("X12345").block()
     server.resetRequests()
-    client = OffenderSearchRestClient(webClient, false, Duration.ofMillis(300))
+    client = OffenderSearchClient(webClient, false, Duration.ofMillis(300))
     listOf("/match", "/search").forEach { path ->
       server.stubFor(post(urlEqualTo(path)).willReturn(aResponse().withStatus(200).withFixedDelay(1000)))
       val error = assertThrows(RuntimeException::class.java) { call(path) }
@@ -214,7 +214,7 @@ class OffenderSearchRestClientTest {
       repository,
       InMemoryOAuth2AuthorizedClientService(repository),
     ).offenderSearchWebClient(WebClient.builder())
-    client = OffenderSearchRestClient(webClient, disableAuthentication, Duration.ofSeconds(10))
+    client = OffenderSearchClient(webClient, disableAuthentication, Duration.ofSeconds(10))
   }
 
   private fun call(path: String) {

@@ -16,7 +16,7 @@ import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.o
 import java.time.Duration
 
 @Component
-class OffenderSearchRestClient(
+class OffenderSearchClient(
   @param:Qualifier("offenderSearchWebClient") private val webClient: WebClient,
   @param:Value("\${offender-search.disable-authentication:false}") private val disableAuthentication: Boolean,
   @param:Value("\${offender-search.timeout:10s}") private val timeout: Duration,
