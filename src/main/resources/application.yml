@@ -84,7 +84,6 @@ springdoc:
 
 person-record-service:
   base-url: ${PERSON_RECORD_SERVICE_BASE_URL:http://localhost:8091}
-  disable-authentication: ${CPR_SERVICE_DISABLE_AUTHENTICATION:false}
   timeout: 10s
 
 court-case-service:
