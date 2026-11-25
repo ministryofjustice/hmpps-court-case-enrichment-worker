@@ -2,6 +2,12 @@
 # Per environment values which override defaults in hmpps-court-case-enrichment-worker/values.yaml
 
 generic-service:
+  batchjobs:
+    - name: enrich-defendants
+      type: ENRICH_DEFENDANTS
+      schedule: "0 3 * * *"
+      suspend: true
+
   ingress:
     host: court-case-enrichment-worker.hmpps.service.justice.gov.uk
     tlsSecretName: court-probation-cert-secret

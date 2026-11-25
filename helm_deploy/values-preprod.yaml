@@ -4,6 +4,12 @@
 generic-service:
   replicaCount: 2
 
+  batchjobs:
+    - name: enrich-defendants
+      type: ENRICH_DEFENDANTS
+      schedule: "0 7 * * *"
+      suspend: false
+
   ingress:
     host: court-case-enrichment-worker-preprod.hmpps.service.justice.gov.uk
     tlsSecretName: court-probation-preprod-cert-secret

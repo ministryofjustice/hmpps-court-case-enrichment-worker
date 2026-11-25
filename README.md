@@ -115,8 +115,18 @@ or [raise a PR](https://github.com/ministryofjustice/hmpps-tech-docs).
 
 ### Defendant enrichment job endpoint
 
-`POST /jobs/enrich-defendants` is reserved for invoking defendant enrichment from
-a Kubernetes CronJob. This POST endpoint permits anonymous access and requires
+The generic-service CronJob starts the application with `BATCH_ENABLED=true` and
+`BATCH_TYPE=ENRICH_DEFENDANTS`, runs defendant enrichment, then closes the application.
+The configured schedules use Europe/London time: 07:00 in dev and preprod, and
+03:00 in prod. Dev and prod schedules are suspended; preprod is enabled.
+Once deployed, a suspended job can be run manually, for example:
+
+```bash
+kubectl create job --from=cronjob/enrichment-worker-enrich-defendants enrichment-worker-enrich-defendants-manual-<user>
+```
+
+`POST /jobs/enrich-defendants` also invokes defendant enrichment. This endpoint
+is not used by the batch CronJob; it permits anonymous access and requires
 no bearer token or request body. Other protected endpoints, including `/ping`,
 still require authentication. Outbound CCS calls still use service OAuth credentials.
 
@@ -167,9 +177,13 @@ and inconsistent exact-match identifiers fail the job instead of becoming
 `NO_MATCH`. Processing stops on the first error and the endpoint returns a
 non-2xx response. Earlier acknowledged writes are not rolled back if a later target
 fails. Results are also returned to the caller on successful runs.
-Do not enable a scheduled CronJob until CCS persistence is implemented and the
-CCS update contract is agreed. An eventual HTTP caller should treat non-2xx responses as job failures
-(for example, use `curl --fail-with-body`).
+CCS persistence is not yet implemented and the CCS update contract is not yet
+agreed, so the enabled preprod CronJob will fail on non-empty runs until it is
+ready. Do not enable or manually run the other CronJobs until then. HTTP callers should treat non-2xx
+responses as job failures (for example, use `curl --fail-with-body`).
+Kubernetes can retry a failed batch Job, and a retry may repeat writes already
+accepted by CCS. Suspending the schedule does not prevent retries of a manually
+started Job; agree replay and idempotency behaviour before running it.
 
 `GET /ping` returns HTTP 200 with the following JSON for a valid HMPPS Auth bearer token.
 No specific role is required. Requests without a valid token return HTTP 401.
