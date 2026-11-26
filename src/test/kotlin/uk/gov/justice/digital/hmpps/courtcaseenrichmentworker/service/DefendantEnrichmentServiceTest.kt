@@ -1,5 +1,10 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.service
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -7,11 +12,15 @@ import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import org.slf4j.LoggerFactory
 import reactor.core.publisher.Mono
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedSex
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CprClient
@@ -43,7 +52,7 @@ class DefendantEnrichmentServiceTest {
       lastName = "Example",
       dateOfBirth = "1990-01-02",
       title = CprTitle(description = "Mr"),
-      sex = CprSex(description = "Male"),
+      sex = CprSex(code = "M", description = "Male"),
       addresses = listOf(
         CprAddress(endDate = "2020-01-01", buildingName = "Old"),
         CprAddress(buildingName = "Current", buildingNumber = "12", thoroughfareName = "Street", dependentLocality = "Locality", postTown = "Town", postcode = "AB1 2CD"),
@@ -69,7 +78,7 @@ class DefendantEnrichmentServiceTest {
     assertEquals("Middle Names", result.defendant?.name?.forename2)
     assertEquals("Example", result.defendant?.name?.surname)
     assertEquals(LocalDate.of(1990, 1, 2), result.defendant?.dateOfBirth)
-    assertEquals("Male", result.defendant?.sex)
+    assertEquals(EnrichedSex.MALE, result.defendant?.sex)
     val address = result.defendant?.address
     assertEquals(listOf("Current", "12", "Street", "Locality", "Town", "AB1 2CD"), listOf(address?.line1, address?.line2, address?.line3, address?.line4, address?.line5, address?.postcode))
     assertEquals("X123", result.offender?.crn)
@@ -87,6 +96,38 @@ class DefendantEnrichmentServiceTest {
     assertEquals(listOf("Two Names"), match.matchIdentifiers.aliases!!.single().middleNames)
     assertEquals("Alias", match.matchIdentifiers.aliases.single().firstName)
     verify(search).search("X123")
+  }
+
+  @ParameterizedTest
+  @CsvSource("M,MALE", "F,FEMALE", "N,NOT_KNOWN", "NS,NOT_SPECIFIED")
+  fun `maps CPR sex code independently of description`(code: String, expected: EnrichedSex) {
+    `when`(cpr.getCommonPlatformPerson("cp")).thenReturn(
+      Mono.just(CprDefendant(sex = CprSex(code = code, description = "unrelated description"))),
+    )
+    assertEquals(expected, service.enrichCommonPlatformDefendant("cp").defendant?.sex)
+  }
+
+  @Test
+  fun `missing CPR sex code remains null even when description is present`() {
+    `when`(cpr.getCommonPlatformPerson("cp")).thenReturn(Mono.just(CprDefendant(sex = CprSex(description = "Male"))))
+    assertNull(service.enrichCommonPlatformDefendant("cp").defendant?.sex)
+  }
+
+  @Test
+  fun `unrecognised CPR sex code maps to not known`() {
+    val logger = LoggerFactory.getLogger(DefendantEnrichmentService::class.java) as Logger
+    val appender = ListAppender<ILoggingEvent>().apply { start() }
+    logger.addAppender(appender)
+    try {
+      `when`(cpr.getCommonPlatformPerson("cp")).thenReturn(Mono.just(CprDefendant(sex = CprSex(code = "sensitive-unexpected"))))
+      assertEquals(EnrichedSex.NOT_KNOWN, service.enrichCommonPlatformDefendant("cp").defendant?.sex)
+      val errors = appender.list.filter { it.level == Level.ERROR }
+      assertThat(errors).hasSize(1)
+      assertThat(errors.single().formattedMessage).isEqualTo("Unrecognised CPR sex code mapped to NOT_KNOWN")
+    } finally {
+      logger.detachAppender(appender)
+      appender.stop()
+    }
   }
 
   @Test

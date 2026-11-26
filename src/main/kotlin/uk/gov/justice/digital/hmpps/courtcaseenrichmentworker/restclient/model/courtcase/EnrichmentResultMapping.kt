@@ -1,9 +1,7 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.courtcase
 
-import org.slf4j.LoggerFactory
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedMatchType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentResult
-import java.util.Locale
 
 fun EnrichmentResult.toPersistenceRequest(jobRunId: String): PersistEnrichmentResultRequest = PersistEnrichmentResultRequest(
   sourceType = sourceType,
@@ -14,7 +12,7 @@ fun EnrichmentResult.toPersistenceRequest(jobRunId: String): PersistEnrichmentRe
       cprUUID = it.cprUUID,
       name = it.name.let { name -> PersistedName(name.title, name.forename1, name.forename2, name.surname) },
       dateOfBirth = it.dateOfBirth,
-      sex = it.sex?.toPersistedSex(jobRunId, sourceType.name),
+      sex = it.sex?.name,
       address = it.address?.let { address ->
         PersistedAddress(address.line1, address.line2, address.line3, address.line4, address.line5, address.postcode)
       },
@@ -49,20 +47,3 @@ fun EnrichmentResult.toPersistenceRequest(jobRunId: String): PersistEnrichmentRe
   errors = errors,
   jobRunId = jobRunId,
 )
-
-private val log = LoggerFactory.getLogger("EnrichmentResultMapping")
-
-private fun String.toPersistedSex(jobRunId: String, sourceType: String): String = when (trim().uppercase(Locale.ROOT).replace(' ', '_')) {
-  "MALE", "M" -> "MALE"
-  "FEMALE", "F" -> "FEMALE"
-  "NOT_KNOWN", "N" -> "NOT_KNOWN"
-  "NOT_SPECIFIED", "NS" -> "NOT_SPECIFIED"
-  else -> {
-    log.error(
-      "Unrecognised defendant.sex mapped to NOT_KNOWN runId={} sourceType={}",
-      jobRunId,
-      sourceType,
-    )
-    "NOT_KNOWN"
-  }
-}
