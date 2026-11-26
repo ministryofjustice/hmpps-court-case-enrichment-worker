@@ -40,7 +40,6 @@ class CprClient(
       when {
         response.statusCode().is2xxSuccessful -> response.bodyToMono<CprDefendant>()
           .switchIfEmpty(Mono.error(IllegalStateException("CPR service returned an empty successful response")))
-
         response.statusCode().value() == 404 -> response.releaseBody().then(Mono.empty())
         else -> response.createException().flatMap { Mono.error(it) }
       }
