@@ -10,9 +10,14 @@ enum class EnrichmentSourceType {
 enum class EnrichmentStatus {
   ENRICHED,
   NO_MATCH,
-  PARTIAL,
-  FAILED,
   NEEDS_REVIEW,
+}
+
+enum class EnrichedSex {
+  MALE,
+  FEMALE,
+  NOT_KNOWN,
+  NOT_SPECIFIED,
 }
 
 data class EnrichmentResult(
@@ -45,7 +50,7 @@ data class EnrichedDefendant(
   val cprUUID: String? = null,
   val name: EnrichedName,
   val dateOfBirth: LocalDate? = null,
-  val sex: String? = null,
+  val sex: EnrichedSex? = null,
   val address: EnrichedAddress? = null,
 )
 

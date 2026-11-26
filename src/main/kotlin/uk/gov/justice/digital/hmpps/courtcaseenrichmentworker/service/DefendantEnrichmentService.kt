@@ -11,6 +11,7 @@ import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedName
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedOffender
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedOffenderMatch
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedProbation
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedSex
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentResult
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
@@ -117,11 +118,23 @@ class DefendantEnrichmentService(
       cprUUID = person.cprUUID,
       name = EnrichedName(person.title?.description, person.firstName, person.middleNames, person.lastName),
       dateOfBirth = person.dateOfBirth?.let(LocalDate::parse),
-      sex = person.sex?.description,
+      sex = mapSex(person.sex?.code),
       address = address?.let {
         EnrichedAddress(it.buildingName, it.buildingNumber, it.thoroughfareName, it.dependentLocality, it.postTown, it.postcode)
       },
     )
+  }
+
+  private fun mapSex(code: String?): EnrichedSex? = when (code) {
+    null -> null
+    "M" -> EnrichedSex.MALE
+    "F" -> EnrichedSex.FEMALE
+    "N" -> EnrichedSex.NOT_KNOWN
+    "NS" -> EnrichedSex.NOT_SPECIFIED
+    else -> {
+      log.error("Unrecognised CPR sex code mapped to NOT_KNOWN")
+      EnrichedSex.NOT_KNOWN
+    }
   }
 
   private companion object {

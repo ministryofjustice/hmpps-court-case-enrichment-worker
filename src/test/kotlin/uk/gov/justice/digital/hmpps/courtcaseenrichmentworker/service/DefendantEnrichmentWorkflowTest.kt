@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.springframework.web.reactive.function.client.WebClient
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.config.DefendantEnrichmentProperties
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichedSex
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentSourceType
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.model.EnrichmentStatus
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CourtCaseServiceClient
@@ -73,14 +74,14 @@ class DefendantEnrichmentWorkflowTest {
       get(urlEqualTo("/person/commonplatform/cp-123"))
         .willReturn(
           aResponse().withHeader("Content-Type", "application/json")
-            .withBody("""{"cprUUID":"record-cp","firstName":"Alex","dateOfBirth":"1990-01-02","sex":{"description":"Not Known"},"identifiers":{"crns":["X123"]}}"""),
+            .withBody("""{"cprUUID":"record-cp","firstName":"Alex","dateOfBirth":"1990-01-02","sex":{"code":"N","description":"Not Known / Not Recorded"},"identifiers":{"crns":["X123"]}}"""),
         ),
     )
     server.stubFor(
       get(urlEqualTo("/person/libra/libra-123"))
         .willReturn(
           aResponse().withHeader("Content-Type", "application/json")
-            .withBody("""{"cprUUID":"record-libra","firstName":"Libra","sex":{"description":"Not Specified"},"identifiers":{"crns":[]}}"""),
+            .withBody("""{"cprUUID":"record-libra","firstName":"Libra","sex":{"code":"NS","description":"Not Specified"},"identifiers":{"crns":[]}}"""),
         ),
     )
     server.stubFor(
@@ -174,8 +175,8 @@ class DefendantEnrichmentWorkflowTest {
     assertEquals(listOf(EnrichmentSourceType.COMMON_PLATFORM, EnrichmentSourceType.LIBRA), results.map { it.sourceType })
     assertEquals(listOf(EnrichmentStatus.ENRICHED, EnrichmentStatus.ENRICHED), results.map { it.status })
     assertEquals("record-cp", results.first().defendant?.cprUUID)
-    assertEquals("Not Known", results.first().defendant?.sex)
-    assertEquals("Not Specified", results.last().defendant?.sex)
+    assertEquals(EnrichedSex.NOT_KNOWN, results.first().defendant?.sex)
+    assertEquals(EnrichedSex.NOT_SPECIFIED, results.last().defendant?.sex)
     assertEquals("X123", results.first().offender?.crn)
     assertEquals("pnc", results.first().offender?.pnc)
     assertEquals("CURRENT", results.first().probation?.probationStatus)

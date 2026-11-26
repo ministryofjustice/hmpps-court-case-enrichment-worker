@@ -15,6 +15,7 @@ import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.CprClie
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.OffenderSearchClient
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprDefendant
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprIdentifier
+import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.cprservice.CprSex
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.offendersearch.OtherIds
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.offendersearch.ProbationStatusDetail
 import uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient.model.offendersearch.SearchResponse
@@ -39,7 +40,7 @@ class DefendantEnrichmentResourceTest : IntegrationTestBase() {
   @ParameterizedTest
   @EnumSource(EnrichmentSourceType::class)
   fun `returns full enrichment using the correct CPR lookup`(source: EnrichmentSourceType) {
-    stubPerson(source, Mono.just(CprDefendant(cprUUID = "record", firstName = "Alex", identifiers = CprIdentifier(crns = listOf("X123")))))
+    stubPerson(source, Mono.just(CprDefendant(cprUUID = "record", firstName = "Alex", sex = CprSex(code = "NS"), identifiers = CprIdentifier(crns = listOf("X123")))))
     `when`(search.search("X123")).thenReturn(
       Mono.just(
         SearchResponses(
@@ -63,6 +64,7 @@ class DefendantEnrichmentResourceTest : IntegrationTestBase() {
       .jsonPath("$.status").isEqualTo("ENRICHED")
       .jsonPath("$.defendant.cprUUID").isEqualTo("record")
       .jsonPath("$.defendant.name.forename1").isEqualTo("Alex")
+      .jsonPath("$.defendant.sex").isEqualTo("NOT_SPECIFIED")
       .jsonPath("$.offender.crn").isEqualTo("X123")
       .jsonPath("$.offender.pnc").isEqualTo("pnc")
       .jsonPath("$.offender.cro").isEqualTo("cro")

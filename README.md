@@ -147,6 +147,9 @@ Offender Search once per distinct CRN per target. No name-based `/match` fallbac
 is performed; this follows CCM's existing `CprService`.
 
 Enrichment builds clean results.
+Defendant sex uses the CPR code to produce `MALE`, `FEMALE`, `NOT_KNOWN`, or
+`NOT_SPECIFIED` in both the enrichment response and CCS persistence request.
+An absent code remains null; an unrecognised code is logged and mapped to `NOT_KNOWN`.
 A CPR 404 produces `NO_MATCH`. A CPR record without
 CRNs still enriches defendant details. Multiple CRNs or zero/multiple Offender
 Search responses produce `NEEDS_REVIEW` with candidate matches, but no selected
