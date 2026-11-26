@@ -1,6 +1,7 @@
 package uk.gov.justice.digital.hmpps.courtcaseenrichmentworker.restclient
 
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
@@ -34,6 +35,7 @@ class CprClient(
   private fun requestCprRecord(path: String, identifier: String): Mono<CprDefendant> = webClient
     .get()
     .uri(path, identifier)
+    .accept(APPLICATION_JSON)
     .exchangeToMono { response ->
       when {
         response.statusCode().is2xxSuccessful -> response.bodyToMono<CprDefendant>()

@@ -6,6 +6,7 @@ import com.github.tomakehurst.wiremock.client.WireMock.get
 import com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
+import io.netty.handler.timeout.ReadTimeoutException
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -15,8 +16,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
+import uk.gov.justice.hmpps.kotlin.auth.unauthenticatedWebClient
 import java.time.Duration
-import java.util.concurrent.TimeoutException
 
 class CprClientTest {
   private val wireMock = WireMockServer(wireMockConfig().dynamicPort())
@@ -129,15 +130,14 @@ class CprClientTest {
       client.getCommonPlatformPerson("defendant-123").block()
     }
 
-    assertTrue(exception.cause is TimeoutException)
+    assertTrue(exception.cause is ReadTimeoutException)
     wireMock.verify(4, getRequestedFor(urlEqualTo("/person/commonplatform/defendant-123")))
   }
 
   private fun createClient(timeout: Duration = Duration.ofSeconds(10)) {
     client =
       CprClient(
-        WebClient.builder().baseUrl("http://localhost:${wireMock.port()}").build(),
-        timeout,
+        WebClient.builder().unauthenticatedWebClient(url = "http://localhost:${wireMock.port()}", timeout = timeout),
       )
   }
 }
