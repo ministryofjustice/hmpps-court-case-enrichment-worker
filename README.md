@@ -113,7 +113,7 @@ or [raise a PR](https://github.com/ministryofjustice/hmpps-tech-docs).
 
 ## Validating a deployment
 
-### Defendant enrichment job endpoint
+### Defendant enrichment batch job
 
 The generic-service CronJob starts the application with `BATCH_ENABLED=true` and
 `BATCH_TYPE=ENRICH_DEFENDANTS`, runs defendant enrichment, then closes the application.
@@ -125,17 +125,7 @@ Once deployed, a suspended job can be run manually, for example:
 kubectl create job --from=cronjob/enrichment-worker-enrich-defendants enrichment-worker-enrich-defendants-manual-<user>
 ```
 
-`POST /jobs/enrich-defendants` also invokes defendant enrichment. This endpoint
-is not used by the batch CronJob; it permits anonymous access and requires
-no bearer token or request body. Other protected endpoints, including `/ping`,
-still require authentication. Outbound CCS calls still use service OAuth credentials.
-
-Calling from the same namespace does not enforce namespace-only access.
-Any caller able to reach this endpoint can trigger the job, including via the
-existing ingress allowlist. Restrict access using ingress rules and Kubernetes
-NetworkPolicies if the endpoint must be limited to internal callers.
-
-The job accepts no court-code parameter. Configure the comma-separated
+Configure the comma-separated
 `DEFENDANT_ENRICHMENT_COURT_CODES` environment variable separately in each
 `helm_deploy/values-<environment>.yaml` file. The job fails when invoked if the
 list is missing or contains a blank court code. Common Platform and Libra
@@ -144,18 +134,11 @@ enrichment are enabled.
 The workflow fetches all Common Platform defendant IDs and Libra cIDs from CCS
 in one request per source and court for 14 days starting today: `fromDate` is today
 (inclusive) and `toDate` is today plus 14 days (exclusive).
-`EnrichmentTargetService` owns these CCS target calls.
-Successful invocations return HTTP 200 with status
-`ENRICHMENT_COMPLETED`, fetched and processed counts for both sources, a
-`courtCodes` list containing all configured courts processed, and a `results`
-array containing Common Platform and Libra enrichment results.
-`persistedResults` counts results acknowledged by CCS; failed counts are zero
-on successful runs. Courts are processed in configuration order. For each court,
+`EnrichmentTargetService` owns these CCS target calls. Courts are processed in
+configuration order. For each court,
 the worker fetches both target lists, then enriches and posts each target to CCS
 before moving to the next court, including `NO_MATCH` and `NEEDS_REVIEW` outcomes.
-The job returns its result only after all configured courts have been processed
-successfully.
-CCS target-fetch, enrichment, and persistence failures fail the job with a non-2xx response.
+CCS target-fetch, enrichment, and persistence failures fail the job.
 
 The enrichment implementation processes Common Platform and then Libra targets synchronously
 using `DefendantEnrichmentService`,
@@ -174,13 +157,8 @@ matching the existing CCM behavior.
 
 Downstream errors, empty successful response bodies, invalid dates, blank CRNs,
 and inconsistent exact-match identifiers fail the job instead of becoming
-`NO_MATCH`. Processing stops on the first error and the endpoint returns a
-non-2xx response. Earlier acknowledged writes are not rolled back if a later target
-fails. Results are also returned to the caller on successful runs.
-CCS persistence is not yet implemented and the CCS update contract is not yet
-agreed, so the enabled preprod CronJob will fail on non-empty runs until it is
-ready. Do not enable or manually run the other CronJobs until then. HTTP callers should treat non-2xx
-responses as job failures (for example, use `curl --fail-with-body`).
+`NO_MATCH`. Processing stops on the first error. Earlier acknowledged writes are
+not rolled back if a later target fails.
 Kubernetes can retry a failed batch Job, and a retry may repeat writes already
 accepted by CCS. Suspending the schedule does not prevent retries of a manually
 started Job; agree replay and idempotency behaviour before running it.
@@ -276,15 +254,13 @@ to call the deployed service.
 Transport failures, timeouts, and HTTP 5xx responses receive up to three retries;
 other HTTP errors and malformed/empty responses are propagated.
 
-#### Draft enrichment persistence contract
+#### Enrichment persistence
 
 `CourtCaseServiceClient.persistEnrichmentResult(PersistEnrichmentResultRequest)`
 posts one clean result per target using the same CCS service OAuth registration.
-The proposed path is **`POST /enrichment-results`**, configurable with
-`COURT_CASE_SERVICE_POST_ENRICHMENT_URL`. This endpoint and request schema are
-drafts: CCS has not implemented or agreed them yet. The batch job now calls
-this method immediately after enriching each target. Until CCS implements the
-endpoint, a non-empty run will fail at its first rejected persistence request.
+The path is **`POST /enrichment-results`**, configurable with
+`COURT_CASE_SERVICE_POST_ENRICHMENT_URL`. The batch job calls this method
+immediately after enriching each target.
 
 The request distinguishes `COMMON_PLATFORM` defendant IDs from `LIBRA` cIDs
 using `sourceType` and `targetId`. It carries an enrichment status, normalized
@@ -296,11 +272,11 @@ No raw CPR or Offender Search response objects are part of the contract.
 
 Any 2xx response acknowledges the write; the response body is discarded.
 Non-2xx responses, including redirects, and transport/timeouts are propagated.
-Writes have a 10-second timeout and **no automatic retries** because CCS write
+Writes have a 60-second default timeout and **no automatic retries** because CCS write
 idempotency is not defined. A timeout may mean the write succeeded at CCS; do not
 blindly replay it.
 
-Before production use, agree the endpoint, accepted statuses, null/omitted
+Before production use, confirm the accepted statuses, null/omitted
 field semantics (preserve versus clear), missing-CPR behavior, protection of
 existing confirmed matches, and idempotency with CCS. In particular, the current
 `CprService` preserves existing date of birth and address when CPR supplies no
