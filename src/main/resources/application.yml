@@ -83,7 +83,6 @@ springdoc:
     enabled: false
 
 person-record-service:
-  base-url: ${PERSON_RECORD_SERVICE_BASE_URL:http://localhost:8091}
   timeout: 10s
 
 court-case-service:

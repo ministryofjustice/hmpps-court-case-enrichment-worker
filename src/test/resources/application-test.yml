@@ -25,6 +25,7 @@ spring:
 
 person-record-service:
   base-url: "http://localhost:8091"
+  timeout: 1s
 
 court-case-service:
   base-url: "http://localhost:8092"
